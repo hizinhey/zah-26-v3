@@ -156,9 +156,10 @@ def test_job_offered_requires_the_fixed_template_set(schema, validator):
 
 def test_operation_oa_endpoints_match_the_persisted_android_contract(openapi):
     operation_path = openapi["paths"]["/api/v1/operations/{operationId}"]
-    replace_oas = operation_path["put"]
+    replace_oas = openapi["paths"]["/api/v1/operations/{operationId}/oas"]["put"]
     schemas = openapi["components"]["schemas"]
 
+    assert "put" not in operation_path
     assert replace_oas["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ReplaceOasRequest"
     }

@@ -48,6 +48,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OperationError'
+  /api/v1/operations/{operationId}/oas:
     put:
       summary: Replace the ordered official accounts for an operation
       operationId: replaceOperationOas
