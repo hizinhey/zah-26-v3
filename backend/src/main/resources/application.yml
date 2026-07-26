@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: opshub-backend
+  datasource:
+    url: ${OPSHUB_DATABASE_URL:jdbc:postgresql://localhost:5432/opshub}
+    username: ${OPSHUB_DATABASE_USERNAME:opshub}
+    password: ${OPSHUB_DATABASE_PASSWORD:opshub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+server:
+  error:
+    include-message: never
