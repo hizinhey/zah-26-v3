@@ -37,12 +37,14 @@ final class TextValidationPrompt {
     private static ObjectNode responseSchema(ObjectMapper objectMapper) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("type", "OBJECT");
+        root.put("additionalProperties", false);
         ObjectNode properties = root.putObject("properties");
         properties.putObject("policyVersion").put("type", "STRING");
         ObjectNode findings = properties.putObject("findings");
         findings.put("type", "ARRAY");
         ObjectNode finding = findings.putObject("items");
         finding.put("type", "OBJECT");
+        finding.put("additionalProperties", false);
         ObjectNode findingProperties = finding.putObject("properties");
         findingProperties.putObject("fieldName").put("type", "STRING");
         ObjectNode status = findingProperties.putObject("status");

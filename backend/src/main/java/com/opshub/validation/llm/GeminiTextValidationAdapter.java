@@ -26,6 +26,10 @@ import java.util.Set;
 public class GeminiTextValidationAdapter implements TextValidationPort {
     private static final String VALIDATOR_TYPE = "gemini-text";
     private static final String DEFAULT_POLICY_VERSION = "gemini-text-v1";
+    private static final Set<String> ROOT_FIELDS = Set.of("policyVersion", "findings");
+    private static final Set<String> FINDING_FIELDS = Set.of(
+            "fieldName", "status", "message", "start", "end", "suggestion", "severity", "confidence"
+    );
 
     private final HttpClient client;
     private final ObjectMapper objectMapper;
@@ -119,6 +123,7 @@ public class GeminiTextValidationAdapter implements TextValidationPort {
 
     private GeminiResponse parseResponse(String responseText) throws IOException {
         JsonNode root = objectMapper.readTree(responseText);
+        rejectUnknownProperties(root, ROOT_FIELDS);
         if (!root.isObject() || !root.has("policyVersion") || !root.get("policyVersion").isTextual()
                 || root.get("policyVersion").asText().isBlank() || !root.has("findings") || !root.get("findings").isArray()) {
             throw new IllegalArgumentException("Gemini response schema is invalid");
@@ -131,6 +136,7 @@ public class GeminiTextValidationAdapter implements TextValidationPort {
     }
 
     private GeminiResponse.Finding parseFinding(JsonNode finding) {
+        rejectUnknownProperties(finding, FINDING_FIELDS);
         String[] required = {"fieldName", "status", "message", "start", "end", "suggestion", "severity", "confidence"};
         for (String field : required) {
             if (!finding.has(field)) {
@@ -226,6 +232,17 @@ public class GeminiTextValidationAdapter implements TextValidationPort {
             throw new IllegalArgumentException("Gemini finding offset is invalid");
         }
         return node.intValue();
+    }
+
+    private static void rejectUnknownProperties(JsonNode node, Set<String> allowedFields) {
+        if (!node.isObject()) {
+            throw new IllegalArgumentException("Gemini response object is invalid");
+        }
+        node.fieldNames().forEachRemaining(fieldName -> {
+            if (!allowedFields.contains(fieldName)) {
+                throw new IllegalArgumentException("Unknown Gemini response field: " + fieldName);
+            }
+        });
     }
 
     private static String stripTrailingSlash(String value) {

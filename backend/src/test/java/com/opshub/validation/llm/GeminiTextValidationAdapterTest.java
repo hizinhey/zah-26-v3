@@ -101,6 +101,73 @@ class GeminiTextValidationAdapterTest {
     }
 
     @Test
+    void convertsMalformedOutputToUnableToCheckForAllRequestedFields() {
+        respond(providerResponse("not-json"));
+
+        List<FieldFinding> findings = adapter.validate(new TextValidationPort.TextValidationRequest(List.of(
+                new TextValidationPort.TextField("oa[1].content.header", "Header"),
+                new TextValidationPort.TextField("oa[1].content.body", "Body")
+        )));
+
+        assertThat(findings).extracting(FieldFinding::status)
+                .containsOnly(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsUnknownRootProperties() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"PASSED","message":null,"start":null,"end":null,"suggestion":null,"severity":null,"confidence":1.0}],"unexpected":true}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsUnknownFindingProperties() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"PASSED","message":null,"start":null,"end":null,"suggestion":null,"severity":null,"confidence":1.0,"unexpected":true}]}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsUnknownStatuses() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"UNKNOWN","message":null,"start":null,"end":null,"suggestion":null,"severity":null,"confidence":1.0}]}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsMissingRequiredFindingFields() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"PASSED","message":null,"start":null,"end":null,"suggestion":null,"severity":null}]}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsOutOfRangeConfidence() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"PASSED","message":null,"start":null,"end":null,"suggestion":null,"severity":null,"confidence":1.1}]}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
+    void rejectsInvalidOffsets() {
+        respond(providerResponse("""
+                {"policyVersion":"gemini-text-v1","findings":[{"fieldName":"oa[1].content.header","status":"FAILED","message":"Error","start":4,"end":2,"suggestion":null,"severity":"ERROR","confidence":0.9}]}
+                """));
+
+        assertThat(validateHeader().getFirst().status()).isEqualTo(FieldStatus.UNABLE_TO_CHECK);
+    }
+
+    @Test
     void convertsRateLimitsToUnableToCheck() {
         server.createContext("/v1beta/models/test-model:generateContent", exchange -> response(exchange, 429, "{\"error\":{\"message\":\"rate limited\"}}"));
 
@@ -143,6 +210,14 @@ class GeminiTextValidationAdapterTest {
                 "test-model",
                 timeout
         );
+    }
+
+    private static String providerResponse(String responseText) {
+        return "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":" + jsonString(responseText) + "}]}}]}";
+    }
+
+    private static String jsonString(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\"";
     }
 
     private void respond(String body) {
