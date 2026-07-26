@@ -1,0 +1,78 @@
+# Operating system and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local mobile script workspace
+mobile_script/
+
+# Isolated implementation worktrees
+.worktrees/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.local
+
+# JavaScript / TypeScript
+node_modules/
+dist/
+build/
+.next/
+.vite/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Java / Spring Boot
+target/
+.gradle/
+*.class
+*.jar
+*.war
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Mobile build artifacts and application packages
+*.apk
+*.aab
+*.ipa
+DerivedData/
+Pods/
+
+# Test execution artifacts
+allure-results/
+allure-report/
+reports/
+screenshots/
+videos/
+recordings/
+test-results/
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+.cache/
+*.tmp
+*.temp
+
+# Local containers and database data
+docker-data/
+postgres-data/
+*.pid
