@@ -76,3 +76,11 @@ temp/
 docker-data/
 postgres-data/
 *.pid
+
+# OpsHub local runtime data and generated automation
+data/
+secrets/
+generated-tests/
+local-hub/generated-tests/
+local-hub/.outbox/
+local-hub/.journal/

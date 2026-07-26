@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opshub.example/contracts/schemas/hub-envelope-v1.json",
+  "title": "HubEnvelopeV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messageId", "version", "type", "timestamp", "payload"],
+  "properties": {
+    "messageId": { "$ref": "#/$defs/Uuid" },
+    "version": { "const": 1 },
+    "type": {
+      "type": "string",
+      "enum": ["JOB_OFFERED", "JOB_PROGRESS", "TEST_RESULT", "HEARTBEAT"]
+    },
+    "timestamp": { "$ref": "#/$defs/Timestamp" },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "JOB_OFFERED" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/JobOfferedPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "JOB_PROGRESS" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/JobProgressPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "TEST_RESULT" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/TestResultPayload" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "HEARTBEAT" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/HeartbeatPayload" } } }
+    }
+  ],
+  "$defs": {
+    "Uuid": { "type": "string", "format": "uuid" },
+    "Revision": { "type": "integer", "minimum": 1 },
+    "Timestamp": { "type": "string", "format": "date-time" },
+    "FieldStatus": {
+      "type": "string",
+      "enum": ["PASSED", "WARNING", "FAILED", "UNABLE_TO_CHECK", "INVALID"]
+    },
+    "OperationStatus": {
+      "type": "string",
+      "enum": ["DRAFT", "VALIDATING", "VALIDATION_FAILED", "VALIDATED", "GENERATING", "GENERATION_FAILED", "READY_FOR_APPROVAL", "APPROVED", "QUEUED", "RUNNING", "PASSED", "FAILED", "ERROR"]
+    },
+    "TestCaseStatus": {
+      "type": "string",
+      "enum": ["PENDING", "READY", "RUNNING", "PASSED", "FAILED", "ERROR"]
+    },
+    "TestResultStatus": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED", "ERROR"]
+    },
+    "ErrorCategory": {
+      "type": "string",
+      "enum": ["ASSERTION_FAILURE", "INFRASTRUCTURE", "TIMEOUT", "CONFIGURATION", "UNKNOWN"]
+    },
+    "TemplateParametersV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oaName", "thumbnailUrl", "expectedHeader", "expectedBody", "expectedButtonText", "expectedRedirectUrl", "expectedRedirectDomain"],
+      "properties": {
+        "oaName": { "type": "string", "minLength": 1 },
+        "thumbnailUrl": { "type": "string", "format": "uri" },
+        "expectedHeader": { "type": "string", "minLength": 1 },
+        "expectedBody": { "type": "string", "minLength": 1 },
+        "expectedButtonText": { "type": "string", "minLength": 1 },
+        "expectedRedirectUrl": { "type": "string", "format": "uri" },
+        "expectedRedirectDomain": { "type": "string", "minLength": 1 }
+      }
+    },
+    "TestCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testCaseId", "order", "templateId", "templateVersion", "parameters"],
+      "properties": {
+        "testCaseId": { "$ref": "#/$defs/Uuid" },
+        "order": { "type": "integer", "minimum": 1 },
+        "templateId": { "type": "string", "minLength": 1 },
+        "templateVersion": { "type": "integer", "minimum": 1 },
+        "parameters": { "$ref": "#/$defs/TemplateParametersV1" }
+      }
+    },
+    "JobOfferedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executionId", "idempotencyKey", "revision", "platform", "testCases"],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/Uuid" },
+        "idempotencyKey": { "type": "string", "minLength": 1 },
+        "revision": { "$ref": "#/$defs/Revision" },
+        "platform": { "const": "ANDROID" },
+        "testCases": { "type": "array", "items": { "$ref": "#/$defs/TestCase" } }
+      }
+    },
+    "JobProgressPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executionId", "testCaseId", "status", "message"],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/Uuid" },
+        "testCaseId": { "$ref": "#/$defs/Uuid" },
+        "status": { "$ref": "#/$defs/TestCaseStatus" },
+        "message": { "type": "string" }
+      }
+    },
+    "TestResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executionId", "testCaseId", "attempt", "status", "durationMs", "errorCategory"],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/Uuid" },
+        "testCaseId": { "$ref": "#/$defs/Uuid" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "status": { "$ref": "#/$defs/TestResultStatus" },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "errorCategory": {
+          "anyOf": [
+            { "$ref": "#/$defs/ErrorCategory" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "HeartbeatPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deviceReady", "runnerReady"],
+      "properties": {
+        "deviceReady": { "type": "boolean" },
+        "runnerReady": { "type": "boolean" }
+      }
+    }
+  }
+}

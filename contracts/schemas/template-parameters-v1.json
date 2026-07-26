@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opshub.example/contracts/schemas/template-parameters-v1.json",
+  "title": "TemplateParametersV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "oaName",
+    "thumbnailUrl",
+    "expectedHeader",
+    "expectedBody",
+    "expectedButtonText",
+    "expectedRedirectUrl",
+    "expectedRedirectDomain"
+  ],
+  "properties": {
+    "oaName": { "type": "string", "minLength": 1 },
+    "thumbnailUrl": { "type": "string", "format": "uri" },
+    "expectedHeader": { "type": "string", "minLength": 1 },
+    "expectedBody": { "type": "string", "minLength": 1 },
+    "expectedButtonText": { "type": "string", "minLength": 1 },
+    "expectedRedirectUrl": { "type": "string", "format": "uri" },
+    "expectedRedirectDomain": { "type": "string", "minLength": 1 }
+  },
+  "examples": [
+    {
+      "oaName": "zBusiness",
+      "thumbnailUrl": "https://example.test/thumb.png",
+      "expectedHeader": "Header",
+      "expectedBody": "Body",
+      "expectedButtonText": "Open now",
+      "expectedRedirectUrl": "https://example.test/path",
+      "expectedRedirectDomain": "example.test"
+    }
+  ]
+}
