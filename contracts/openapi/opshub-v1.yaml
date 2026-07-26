@@ -128,18 +128,139 @@ components:
         expectedRedirectUrl: { type: string, format: uri }
         expectedRedirectDomain: { type: string, minLength: 1 }
     HubEnvelopeV1:
+      oneOf:
+        - $ref: '#/components/schemas/JobOfferedEnvelope'
+        - $ref: '#/components/schemas/JobProgressEnvelope'
+        - $ref: '#/components/schemas/TestResultEnvelope'
+        - $ref: '#/components/schemas/HeartbeatEnvelope'
+      discriminator:
+        propertyName: type
+        mapping:
+          JOB_OFFERED: '#/components/schemas/JobOfferedEnvelope'
+          JOB_PROGRESS: '#/components/schemas/JobProgressEnvelope'
+          TEST_RESULT: '#/components/schemas/TestResultEnvelope'
+          HEARTBEAT: '#/components/schemas/HeartbeatEnvelope'
+    JobOfferedEnvelope:
       type: object
       additionalProperties: false
       required: [messageId, version, type, timestamp, payload]
       properties:
         messageId: { $ref: '#/components/schemas/Uuid' }
         version: { type: integer, const: 1 }
-        type:
-          type: string
-          enum: [JOB_OFFERED, JOB_PROGRESS, TEST_RESULT, HEARTBEAT]
+        type: { const: JOB_OFFERED }
         timestamp: { $ref: '#/components/schemas/Timestamp' }
-        payload:
-          type: object
+        payload: { $ref: '#/components/schemas/JobOfferedPayload' }
+    JobProgressEnvelope:
+      type: object
+      additionalProperties: false
+      required: [messageId, version, type, timestamp, payload]
+      properties:
+        messageId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, const: 1 }
+        type: { const: JOB_PROGRESS }
+        timestamp: { $ref: '#/components/schemas/Timestamp' }
+        payload: { $ref: '#/components/schemas/JobProgressPayload' }
+    TestResultEnvelope:
+      type: object
+      additionalProperties: false
+      required: [messageId, version, type, timestamp, payload]
+      properties:
+        messageId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, const: 1 }
+        type: { const: TEST_RESULT }
+        timestamp: { $ref: '#/components/schemas/Timestamp' }
+        payload: { $ref: '#/components/schemas/TestResultPayload' }
+    HeartbeatEnvelope:
+      type: object
+      additionalProperties: false
+      required: [messageId, version, type, timestamp, payload]
+      properties:
+        messageId: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, const: 1 }
+        type: { const: HEARTBEAT }
+        timestamp: { $ref: '#/components/schemas/Timestamp' }
+        payload: { $ref: '#/components/schemas/HeartbeatPayload' }
+    TestCase:
+      type: object
+      additionalProperties: false
+      required: [testCaseId, order, templateId, templateVersion, parameters]
+      properties:
+        testCaseId: { $ref: '#/components/schemas/Uuid' }
+        order: { type: integer, minimum: 1 }
+        templateId: { type: string, minLength: 1 }
+        templateVersion: { type: integer, minimum: 1 }
+        parameters: { $ref: '#/components/schemas/TemplateParametersV1' }
+    OrderedTestCases:
+      type: array
+      minItems: 5
+      maxItems: 5
+      prefixItems:
+        - allOf:
+            - $ref: '#/components/schemas/TestCase'
+            - properties:
+                order: { const: 1 }
+                templateId: { const: android-oa-delivery-v1 }
+        - allOf:
+            - $ref: '#/components/schemas/TestCase'
+            - properties:
+                order: { const: 2 }
+                templateId: { const: android-thumbnail-v1 }
+        - allOf:
+            - $ref: '#/components/schemas/TestCase'
+            - properties:
+                order: { const: 3 }
+                templateId: { const: android-content-v1 }
+        - allOf:
+            - $ref: '#/components/schemas/TestCase'
+            - properties:
+                order: { const: 4 }
+                templateId: { const: android-button-text-v1 }
+        - allOf:
+            - $ref: '#/components/schemas/TestCase'
+            - properties:
+                order: { const: 5 }
+                templateId: { const: android-redirect-v1 }
+      items: false
+    JobOfferedPayload:
+      type: object
+      additionalProperties: false
+      required: [executionId, idempotencyKey, revision, platform, testCases]
+      properties:
+        executionId: { $ref: '#/components/schemas/Uuid' }
+        idempotencyKey: { type: string, minLength: 1 }
+        revision: { $ref: '#/components/schemas/Revision' }
+        platform: { const: ANDROID }
+        testCases: { $ref: '#/components/schemas/OrderedTestCases' }
+    JobProgressPayload:
+      type: object
+      additionalProperties: false
+      required: [executionId, testCaseId, status, message]
+      properties:
+        executionId: { $ref: '#/components/schemas/Uuid' }
+        testCaseId: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/TestCaseStatus' }
+        message: { type: string }
+    TestResultPayload:
+      type: object
+      additionalProperties: false
+      required: [executionId, testCaseId, attempt, status, durationMs, errorCategory]
+      properties:
+        executionId: { $ref: '#/components/schemas/Uuid' }
+        testCaseId: { $ref: '#/components/schemas/Uuid' }
+        attempt: { type: integer, minimum: 1 }
+        status: { $ref: '#/components/schemas/TestResultStatus' }
+        durationMs: { type: integer, minimum: 0 }
+        errorCategory:
+          anyOf:
+            - $ref: '#/components/schemas/ErrorCategory'
+            - type: 'null'
+    HeartbeatPayload:
+      type: object
+      additionalProperties: false
+      required: [deviceReady, runnerReady]
+      properties:
+        deviceReady: { type: boolean }
+        runnerReady: { type: boolean }
     Operation:
       type: object
       additionalProperties: false

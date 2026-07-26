@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,50 @@ from jsonschema.validators import validator_for
 
 
 CONTRACTS_ROOT = Path(__file__).parents[1]
+TEMPLATE_IDS = [
+    "android-oa-delivery-v1",
+    "android-thumbnail-v1",
+    "android-content-v1",
+    "android-button-text-v1",
+    "android-redirect-v1",
+]
+
+
+def job_offered_payload():
+    return {
+        "executionId": "186a56af-d743-4ffd-8e68-4d034d2927a6",
+        "idempotencyKey": "run-186a56af-d743-4ffd-8e68-4d034d2927a6",
+        "revision": 7,
+        "platform": "ANDROID",
+        "testCases": [
+            {
+                "testCaseId": f"00000000-0000-4000-8000-00000000000{order}",
+                "order": order,
+                "templateId": template_id,
+                "templateVersion": 1,
+                "parameters": {
+                    "oaName": "zBusiness",
+                    "thumbnailUrl": "https://example.test/thumb.png",
+                    "expectedHeader": "Header",
+                    "expectedBody": "Body",
+                    "expectedButtonText": "Open now",
+                    "expectedRedirectUrl": "https://example.test/path",
+                    "expectedRedirectDomain": "example.test",
+                },
+            }
+            for order, template_id in enumerate(TEMPLATE_IDS, start=1)
+        ],
+    }
+
+
+def job_offered_envelope():
+    return {
+        "messageId": "ac4e9772-5f04-40d0-a32c-323c0b93ceff",
+        "version": 1,
+        "type": "JOB_OFFERED",
+        "timestamp": "2026-07-26T00:00:00Z",
+        "payload": job_offered_payload(),
+    }
 
 
 @pytest.fixture
@@ -26,19 +71,7 @@ def validator():
 
 @pytest.fixture(
     params=[
-        {
-            "messageId": "ac4e9772-5f04-40d0-a32c-323c0b93ceff",
-            "version": 1,
-            "type": "JOB_OFFERED",
-            "timestamp": "2026-07-26T00:00:00Z",
-            "payload": {
-                "executionId": "186a56af-d743-4ffd-8e68-4d034d2927a6",
-                "idempotencyKey": "run-186a56af-d743-4ffd-8e68-4d034d2927a6",
-                "revision": 7,
-                "platform": "ANDROID",
-                "testCases": [],
-            },
-        },
+        job_offered_envelope(),
         {
             "messageId": "bbf717c1-1ff3-4b85-8d01-b67a7ce545f5",
             "version": 1,
@@ -90,4 +123,25 @@ def test_hub_envelope_requires_message_id(schema, validator):
         "timestamp": "2026-07-26T00:00:00Z",
         "payload": {},
     }
+    assert list(validator(schema).iter_errors(payload))
+
+
+def test_job_offered_requires_exactly_five_fixed_cases(schema, validator):
+    payload = job_offered_envelope()
+    payload["payload"]["testCases"].pop()
+
+    assert list(validator(schema).iter_errors(payload))
+
+
+def test_job_offered_requires_the_fixed_case_order(schema, validator):
+    payload = deepcopy(job_offered_envelope())
+    payload["payload"]["testCases"][0]["order"] = 2
+
+    assert list(validator(schema).iter_errors(payload))
+
+
+def test_job_offered_requires_the_fixed_template_set(schema, validator):
+    payload = deepcopy(job_offered_envelope())
+    payload["payload"]["testCases"][4]["templateId"] = "android-other-v1"
+
     assert list(validator(schema).iter_errors(payload))

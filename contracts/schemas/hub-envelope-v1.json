@@ -83,6 +83,44 @@
         "parameters": { "$ref": "#/$defs/TemplateParametersV1" }
       }
     },
+    "OrderedTestCases": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/TestCase" },
+            { "properties": { "order": { "const": 1 }, "templateId": { "const": "android-oa-delivery-v1" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/TestCase" },
+            { "properties": { "order": { "const": 2 }, "templateId": { "const": "android-thumbnail-v1" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/TestCase" },
+            { "properties": { "order": { "const": 3 }, "templateId": { "const": "android-content-v1" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/TestCase" },
+            { "properties": { "order": { "const": 4 }, "templateId": { "const": "android-button-text-v1" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/TestCase" },
+            { "properties": { "order": { "const": 5 }, "templateId": { "const": "android-redirect-v1" } } }
+          ]
+        }
+      ],
+      "items": false
+    },
     "JobOfferedPayload": {
       "type": "object",
       "additionalProperties": false,
@@ -92,7 +130,7 @@
         "idempotencyKey": { "type": "string", "minLength": 1 },
         "revision": { "$ref": "#/$defs/Revision" },
         "platform": { "const": "ANDROID" },
-        "testCases": { "type": "array", "items": { "$ref": "#/$defs/TestCase" } }
+        "testCases": { "$ref": "#/$defs/OrderedTestCases" }
       }
     },
     "JobProgressPayload": {
