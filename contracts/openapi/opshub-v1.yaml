@@ -85,6 +85,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RevisionConflictError'
+  /api/v1/operations/{operationId}/validate:
+    post:
+      summary: Validate the current operation revision and return generation gating
+      operationId: validateOperation
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateOperationRequest'
+      responses:
+        '200':
+          description: Persisted validation findings and generation readiness
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationError'
+        '409':
+          description: The expected revision is stale
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflictError'
   /api/v1/hubs/{hubId}/jobs/next:
     get:
       summary: Long-poll the next Hub job
@@ -197,6 +228,12 @@ components:
           type: array
           description: Accounts are persisted in this array order as OA order 1..N.
           items: { $ref: '#/components/schemas/OfficialAccountInput' }
+    ValidateOperationRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision]
+      properties:
+        expectedRevision: { $ref: '#/components/schemas/Revision' }
     OfficialAccount:
       type: object
       additionalProperties: false
@@ -229,6 +266,37 @@ components:
         code: { const: REVISION_CONFLICT }
         message: { type: string }
         currentRevision: { $ref: '#/components/schemas/Revision' }
+    FieldFinding:
+      type: object
+      additionalProperties: false
+      required: [fieldName, validatorType, status]
+      properties:
+        fieldName: { type: string }
+        validatorType: { type: string }
+        status: { $ref: '#/components/schemas/FieldStatus' }
+        issue: { type: [string, 'null'] }
+        location: { type: [string, 'null'] }
+        suggestion: { type: [string, 'null'] }
+        severity: { type: [string, 'null'] }
+        confidence: { type: [number, 'null'], minimum: 0, maximum: 1 }
+    ValidationRun:
+      type: object
+      additionalProperties: false
+      required: [id, operationId, sourceRevision, status, findings, canGenerate, generateDisabledReasons]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        operationId: { $ref: '#/components/schemas/Uuid' }
+        sourceRevision: { $ref: '#/components/schemas/Revision' }
+        status:
+          type: string
+          enum: [VALIDATION_FAILED, VALIDATED]
+        findings:
+          type: array
+          items: { $ref: '#/components/schemas/FieldFinding' }
+        canGenerate: { type: boolean }
+        generateDisabledReasons:
+          type: array
+          items: { type: string }
     TemplateParametersV1:
       type: object
       additionalProperties: false
