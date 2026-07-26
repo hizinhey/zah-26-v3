@@ -11,6 +11,13 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+opshub:
+  validation:
+    thumbnail:
+      connect-timeout: 2s
+      request-timeout: 3s
+      max-bytes: 5242880
+      max-redirects: 5
 server:
   error:
     include-message: never

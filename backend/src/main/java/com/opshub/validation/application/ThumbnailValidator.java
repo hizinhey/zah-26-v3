@@ -1,6 +1,7 @@
 package com.opshub.validation.application;
 
 import com.opshub.validation.domain.FieldFinding;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -23,8 +24,16 @@ public class ThumbnailValidator {
     private final int maxBytes;
     private final int maxRedirects;
 
-    public ThumbnailValidator() {
-        this(Duration.ofSeconds(2), Duration.ofSeconds(3), 5 * 1024 * 1024, 5);
+    @Autowired
+    public ThumbnailValidator(ThumbnailValidationProperties properties) {
+        properties.validate();
+        this.client = HttpClient.newBuilder()
+                .connectTimeout(properties.getConnectTimeout())
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        this.requestTimeout = properties.getRequestTimeout();
+        this.maxBytes = properties.getMaxBytes();
+        this.maxRedirects = properties.getMaxRedirects();
     }
 
     public ThumbnailValidator(Duration connectTimeout, Duration requestTimeout, int maxBytes, int maxRedirects) {
@@ -64,7 +73,11 @@ public class ThumbnailValidator {
                         if (location == null || redirects >= maxRedirects) {
                             return FieldFinding.failed(FIELD_NAME, VALIDATOR_TYPE, "The thumbnail redirect limit was exceeded");
                         }
-                        current = current.resolve(location);
+                        try {
+                            current = current.resolve(location);
+                        } catch (IllegalArgumentException exception) {
+                            return FieldFinding.failed(FIELD_NAME, VALIDATOR_TYPE, "The thumbnail redirect location is malformed");
+                        }
                         if (!isHttpUrl(current)) {
                             return FieldFinding.failed(FIELD_NAME, VALIDATOR_TYPE, "The thumbnail redirect must use HTTP or HTTPS");
                         }

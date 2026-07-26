@@ -57,6 +57,13 @@ class ThumbnailValidatorTest {
     }
 
     @Test
+    void rejectsMalformedRedirectLocationsWithoutAbortingValidation() {
+        server.createContext("/malformed-redirect", exchange -> redirect(exchange, "http://[malformed"));
+
+        assertThat(validator.validate(baseUrl + "/malformed-redirect").status()).isEqualTo(FieldStatus.FAILED);
+    }
+
+    @Test
     void rejectsAResponseWhoseMimeTypeIsNotAnImage() {
         server.createContext("/text", exchange -> response(exchange, 200, "text/plain", "not an image".getBytes(StandardCharsets.UTF_8)));
 
