@@ -1,4 +1,5 @@
 import json
+import tomllib
 from copy import deepcopy
 from pathlib import Path
 
@@ -176,3 +177,10 @@ def test_operation_oa_endpoints_match_the_persisted_android_contract(openapi):
     assert schemas["OfficialAccountInput"]["properties"]["platform"] == {"const": "ANDROID"}
     assert schemas["RevisionConflictError"]["required"] == ["code", "message", "currentRevision"]
     assert schemas["RevisionConflictError"]["properties"]["code"] == {"const": "REVISION_CONFLICT"}
+
+
+def test_contract_test_dependencies_include_pyyaml():
+    with (CONTRACTS_ROOT.parent / "local-hub" / "pyproject.toml").open("rb") as project_file:
+        project = tomllib.load(project_file)
+
+    assert "PyYAML>=6.0,<7" in project["project"]["optional-dependencies"]["dev"]
