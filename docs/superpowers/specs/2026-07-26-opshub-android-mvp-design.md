@@ -187,6 +187,8 @@ Gemini cannot choose a subset, add imports, change selectors, introduce commands
 
 The MVP has no sidebar. It contains only the four connected screens and their step indicator.
 
+The four supplied PRD mockups are the visual source of truth for these screens. Implementation must preserve their information hierarchy, four-step progress indicator, card and table structure, status colors, action placement, typography scale, spacing rhythm, and execution-queue presentation. The sidebar shown in the references is the only intentional structural omission. Responsive behavior may reflow the layout for narrower screens, but it must not change the workflow, content priority, status semantics, or gating behavior. Frontend visual verification must compare each implemented screen against its corresponding mockup at the primary desktop viewport.
+
 ### 7.1 Screen 1: Input OA Details
 
 - Enter Jira ID.
@@ -375,4 +377,3 @@ The MVP is accepted when it can:
 9. Persist and display results, retries, logs, and screenshot evidence.
 10. Demonstrate WebSocket operation and automatic HTTP fallback.
 11. Prove that any input edit or OA reorder invalidates validation, generation, and approval.
-
