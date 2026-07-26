@@ -7,6 +7,7 @@ import com.opshub.operation.domain.Operation;
 import com.opshub.operation.domain.OperationStatus;
 import com.opshub.validation.domain.FieldFinding;
 import com.opshub.validation.domain.FieldStatus;
+import com.opshub.validation.llm.TextValidationPort;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,17 +30,20 @@ public class ValidationService {
     private final ContentParser contentParser;
     private final UrlDirectionValidator urlDirectionValidator;
     private final ThumbnailValidator thumbnailValidator;
+    private final TextValidationPort textValidationPort;
 
     public ValidationService(
             JdbcTemplate jdbcTemplate,
             ContentParser contentParser,
             UrlDirectionValidator urlDirectionValidator,
-            ThumbnailValidator thumbnailValidator
+            ThumbnailValidator thumbnailValidator,
+            TextValidationPort textValidationPort
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.contentParser = contentParser;
         this.urlDirectionValidator = urlDirectionValidator;
         this.thumbnailValidator = thumbnailValidator;
+        this.textValidationPort = textValidationPort;
     }
 
     @Transactional
@@ -49,7 +53,7 @@ public class ValidationService {
             throw new RevisionConflictException(operation.getRevision());
         }
 
-        List<FieldFinding> findings = validate(operation);
+        List<FieldFinding> findings = collectFindings(operation);
         boolean canGenerate = findings.stream().allMatch(finding -> finding.status() == FieldStatus.PASSED);
         OperationStatus status = canGenerate ? OperationStatus.VALIDATED : OperationStatus.VALIDATION_FAILED;
         UUID validationRunId = UUID.randomUUID();
@@ -61,8 +65,9 @@ public class ValidationService {
                         """, operationId, revision);
         jdbcTemplate.update("""
                         INSERT INTO validation_runs (id, operation_id, source_revision, policy_version, model, status)
-                        VALUES (?, ?, ?, 'deterministic-v1', NULL, ?)
-                        """, validationRunId, operationId, revision, status.name());
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """, validationRunId, operationId, revision,
+                "deterministic-v1+" + textValidationPort.policyVersion(), textValidationPort.model(), status.name());
         for (FieldFinding finding : findings) {
             jdbcTemplate.update("""
                             INSERT INTO field_findings (id, validation_run_id, field_name, validator_type, status, issue, location, suggestion, severity, confidence)
@@ -92,8 +97,9 @@ public class ValidationService {
         );
     }
 
-    private List<FieldFinding> validate(Operation operation) {
+    List<FieldFinding> collectFindings(Operation operation) {
         List<FieldFinding> findings = new ArrayList<>();
+        List<TextValidationPort.TextField> textFields = new ArrayList<>();
         if (operation.getOfficialAccounts().isEmpty()) {
             findings.add(FieldFinding.failed("oas", "required", "At least one official account is required"));
         }
@@ -105,7 +111,13 @@ public class ValidationService {
             findings.add(required(fieldPrefix + "content.header", parsed.header()));
             findings.add(required(fieldPrefix + "content.body", parsed.body()));
             findings.add(required(fieldPrefix + "buttonText", account.getButtonText()));
+            textFields.add(new TextValidationPort.TextField(fieldPrefix + "content.header", parsed.header()));
+            textFields.add(new TextValidationPort.TextField(fieldPrefix + "content.body", parsed.body()));
+            textFields.add(new TextValidationPort.TextField(fieldPrefix + "buttonText", account.getButtonText()));
             findings.add(urlDirectionValidator.validate(account.getRedirectUrl()).forField(fieldPrefix + "redirectUrl"));
+        }
+        if (!textFields.isEmpty()) {
+            findings.addAll(textValidationPort.validate(new TextValidationPort.TextValidationRequest(textFields)));
         }
         return findings;
     }

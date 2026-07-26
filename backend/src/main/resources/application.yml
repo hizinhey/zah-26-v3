@@ -13,6 +13,9 @@ spring:
     enabled: true
 opshub:
   validation:
+    gemini:
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+      request-timeout: 5s
     thumbnail:
       connect-timeout: 2s
       request-timeout: 3s

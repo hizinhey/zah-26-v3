@@ -37,6 +37,8 @@ class ValidationGatingIT {
 
     private static HttpServer imageServer;
     private static String thumbnailUrl;
+    private static final HttpServer geminiServer = startGeminiServer();
+    private static final String geminiUrl = "http://127.0.0.1:" + geminiServer.getAddress().getPort();
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,6 +48,8 @@ class ValidationGatingIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("GEMINI_API_KEY", () -> "test-key");
+        registry.add("opshub.validation.gemini.base-url", () -> geminiUrl);
     }
 
     @BeforeAll
@@ -59,6 +63,7 @@ class ValidationGatingIT {
     @AfterAll
     static void stopImageServer() {
         imageServer.stop(0);
+        geminiServer.stop(0);
     }
 
     @Test
@@ -129,6 +134,28 @@ class ValidationGatingIT {
         ImageIO.write(image, "png", output);
         byte[] bytes = output.toByteArray();
         exchange.getResponseHeaders().add("Content-Type", "image/png");
+        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.getResponseBody().write(bytes);
+        exchange.close();
+    }
+
+    private static HttpServer startGeminiServer() {
+        try {
+            HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/v1beta/models/gemini-2.5-flash-lite:generateContent", ValidationGatingIT::geminiResponse);
+            server.start();
+            return server;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not start Gemini test server", exception);
+        }
+    }
+
+    private static void geminiResponse(HttpExchange exchange) throws IOException {
+        String body = """
+                {"candidates":[{"content":{"parts":[{"text":"{\\\"policyVersion\\\":\\\"gemini-text-v1\\\",\\\"findings\\\":[{\\\"fieldName\\\":\\\"oa[1].content.header\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].content.body\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].buttonText\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0}]}"}]}}]}
+                """;
+        byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
