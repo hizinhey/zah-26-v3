@@ -10,6 +10,12 @@ paths:
     post:
       summary: Create a test operation
       operationId: createOperation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOperationRequest'
       responses:
         '201':
           description: Created operation
@@ -17,6 +23,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Operation'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationError'
   /api/v1/operations/{operationId}:
     get:
       summary: Get a test operation
@@ -30,6 +42,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Operation'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationError'
+    put:
+      summary: Replace the ordered official accounts for an operation
+      operationId: replaceOperationOas
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceOasRequest'
+      responses:
+        '200':
+          description: Updated operation with persisted official accounts in OA order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '400':
+          description: Invalid request or unsupported platform
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationError'
+        '404':
+          description: Operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationError'
+        '409':
+          description: The expected revision is stale
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionConflictError'
   /api/v1/hubs/{hubId}/jobs/next:
     get:
       summary: Long-poll the next Hub job
@@ -115,6 +169,65 @@ components:
     ErrorCategory:
       type: string
       enum: [ASSERTION_FAILURE, INFRASTRUCTURE, TIMEOUT, CONFIGURATION, UNKNOWN]
+    CreateOperationRequest:
+      type: object
+      additionalProperties: false
+      required: [jiraId]
+      properties:
+        jiraId: { type: string, minLength: 1 }
+    OfficialAccountInput:
+      type: object
+      additionalProperties: false
+      required: [platform, oaName, thumbnailUrl, content, buttonText, redirectUrl]
+      properties:
+        platform: { const: ANDROID }
+        oaName: { type: string, minLength: 1 }
+        thumbnailUrl: { type: string, format: uri }
+        content: { type: string, minLength: 1 }
+        buttonText: { type: string, minLength: 1 }
+        redirectUrl: { type: string, format: uri }
+    ReplaceOasRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedRevision, oas]
+      properties:
+        expectedRevision: { $ref: '#/components/schemas/Revision' }
+        oas:
+          type: array
+          description: Accounts are persisted in this array order as OA order 1..N.
+          items: { $ref: '#/components/schemas/OfficialAccountInput' }
+    OfficialAccount:
+      type: object
+      additionalProperties: false
+      required: [id, oaOrder, platform, oaName, thumbnailUrl, content, buttonText, redirectUrl]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        oaOrder: { type: integer, minimum: 1 }
+        platform: { const: ANDROID }
+        oaName: { type: string, minLength: 1 }
+        thumbnailUrl: { type: string, format: uri }
+        content: { type: string, minLength: 1 }
+        buttonText: { type: string, minLength: 1 }
+        redirectUrl: { type: string, format: uri }
+    OperationError:
+      type: object
+      additionalProperties: false
+      required: [code, message, currentRevision]
+      properties:
+        code: { type: string, enum: [INVALID_REQUEST, UNSUPPORTED_PLATFORM, OPERATION_NOT_FOUND] }
+        message: { type: string }
+        currentRevision:
+          anyOf:
+            - $ref: '#/components/schemas/Revision'
+            - type: 'null'
+    RevisionConflictError:
+      type: object
+      additionalProperties: false
+      required: [code, message, currentRevision]
+      properties:
+        code: { const: REVISION_CONFLICT }
+        message: { type: string }
+        currentRevision: { $ref: '#/components/schemas/Revision' }
     TemplateParametersV1:
       type: object
       additionalProperties: false
@@ -264,7 +377,7 @@ components:
     Operation:
       type: object
       additionalProperties: false
-      required: [id, jiraId, revision, status, createdAt, updatedAt]
+      required: [id, jiraId, revision, status, createdAt, updatedAt, oas]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         jiraId: { type: string, minLength: 1 }
@@ -272,3 +385,6 @@ components:
         status: { $ref: '#/components/schemas/OperationStatus' }
         createdAt: { $ref: '#/components/schemas/Timestamp' }
         updatedAt: { $ref: '#/components/schemas/Timestamp' }
+        oas:
+          type: array
+          items: { $ref: '#/components/schemas/OfficialAccount' }

@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema.validators import validator_for
 
 
@@ -67,6 +68,12 @@ def validator():
         return validator_class
 
     return build
+
+
+@pytest.fixture
+def openapi():
+    with (CONTRACTS_ROOT / "openapi" / "opshub-v1.yaml").open() as contract_file:
+        return yaml.safe_load(contract_file)
 
 
 @pytest.fixture(
@@ -145,3 +152,26 @@ def test_job_offered_requires_the_fixed_template_set(schema, validator):
     payload["payload"]["testCases"][4]["templateId"] = "android-other-v1"
 
     assert list(validator(schema).iter_errors(payload))
+
+
+def test_operation_oa_endpoints_match_the_persisted_android_contract(openapi):
+    operation_path = openapi["paths"]["/api/v1/operations/{operationId}"]
+    replace_oas = operation_path["put"]
+    schemas = openapi["components"]["schemas"]
+
+    assert replace_oas["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ReplaceOasRequest"
+    }
+    assert replace_oas["responses"]["409"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/RevisionConflictError"
+    }
+    assert schemas["Operation"]["required"] == [
+        "id", "jiraId", "revision", "status", "createdAt", "updatedAt", "oas"
+    ]
+    assert schemas["ReplaceOasRequest"]["required"] == ["expectedRevision", "oas"]
+    assert schemas["ReplaceOasRequest"]["properties"]["expectedRevision"] == {
+        "$ref": "#/components/schemas/Revision"
+    }
+    assert schemas["OfficialAccountInput"]["properties"]["platform"] == {"const": "ANDROID"}
+    assert schemas["RevisionConflictError"]["required"] == ["code", "message", "currentRevision"]
+    assert schemas["RevisionConflictError"]["properties"]["code"] == {"const": "REVISION_CONFLICT"}
