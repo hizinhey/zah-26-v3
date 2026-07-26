@@ -66,7 +66,7 @@ def validator():
     def build(schema):
         validator_class = validator_for(schema)
         validator_class.check_schema(schema)
-        return validator_class
+        return validator_class(schema)
 
     return build
 
@@ -103,7 +103,7 @@ def openapi():
                 "attempt": 1,
                 "status": "PASSED",
                 "durationMs": 1200,
-                "errorCategory": null,
+                "errorCategory": None,
             },
         },
         {
