@@ -70,16 +70,29 @@ for dir in "$DATA_DIR" "$DATA_DIR/evidence" "$POSTGRES_DIR" "$TLS_DIR"; do
 done
 
 # --- Ownership / permissions ---
-# The backend and postgres containers run as non-root users (uid mapped
-# via the container's own user namespace); the host directories only need
-# to be writable by Docker, which normally runs as root.
-for dir in "$DATA_DIR" "$POSTGRES_DIR"; do
-  if [[ -d "$dir" && -w "$dir" ]]; then
-    ok "writable: $dir"
-  elif [[ -d "$dir" ]]; then
-    fail "not writable by the current user: $dir"
+# postgres:16-alpine's own entrypoint chowns PGDATA to its runtime user on first
+# start when launched as root, so POSTGRES_DIR only needs to be writable by
+# whoever runs `docker compose up` (normally root). The backend image is
+# different: it drops to a pinned non-root user (opshub, uid/gid 999 - see
+# backend/Dockerfile) with no equivalent self-chowning entrypoint, and a bind
+# mount takes its permissions from the host side regardless of what the image
+# chowned at build time. Without this chown, the backend container can create
+# files directly under /var/lib/opshub (baked into the image) but not inside
+# the DATA_DIR/evidence bind mount - every evidence upload then fails with
+# "Could not persist evidence" (AccessDeniedException) even though the
+# directory "exists" and is writable by the *host* user running preflight.
+if [[ -d "$DATA_DIR" ]]; then
+  if chown -R 999:999 "$DATA_DIR" 2>/dev/null; then
+    ok "chowned $DATA_DIR to uid/gid 999 (backend container's opshub user)"
+  else
+    fail "could not chown $DATA_DIR to 999:999 (run preflight as root, or chown it manually)"
   fi
-done
+fi
+if [[ -d "$POSTGRES_DIR" && -w "$POSTGRES_DIR" ]]; then
+  ok "writable: $POSTGRES_DIR"
+elif [[ -d "$POSTGRES_DIR" ]]; then
+  fail "not writable by the current user: $POSTGRES_DIR"
+fi
 
 # --- SELinux-compatible volume labels ---
 if command -v getenforce >/dev/null 2>&1; then

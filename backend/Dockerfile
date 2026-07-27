@@ -33,7 +33,11 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r opshub && useradd -r -g opshub -d /opt/opshub -s /usr/sbin/nologin opshub
+# Pinned uid/gid (not just -r's "next available system id") so bind-mounted host
+# directories (OPSHUB_DATA_DIR, see deploy/compose.yaml) can be chowned to a stable
+# owner across image rebuilds - see deploy/scripts/preflight.sh section that chowns
+# to this same 999:999.
+RUN groupadd -r -g 999 opshub && useradd -r -u 999 -g opshub -d /opt/opshub -s /usr/sbin/nologin opshub
 
 WORKDIR /opt/opshub
 

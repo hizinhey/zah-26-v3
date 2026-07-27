@@ -50,7 +50,7 @@ public class ExecutionService {
             rs.getInt("source_revision"),
             rs.getString("idempotency_key"),
             rs.getString("status"),
-            rs.getObject("queued_at", Instant.class)
+            rs.getTimestamp("queued_at").toInstant()
     );
 
     @Autowired
