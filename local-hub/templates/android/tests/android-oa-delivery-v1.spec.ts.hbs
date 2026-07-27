@@ -1,0 +1,24 @@
+import zaloApp from '../pages/zalo-app.page';
+import bottomTabBar from '../pages/bottom-tab-bar.page';
+import messagesTab from '../pages/messages-tab.page';
+
+const test = it;
+const OA_NAME = {{{json oaName}}};
+
+describe('@android OA delivery', () => {
+  beforeEach(async () => {
+    await zaloApp.open();
+    await bottomTabBar.openMessagesTab();
+  });
+
+  after(async () => {
+    await driver.terminateApp(zaloApp.packageName);
+  });
+
+  test('shows the delivered official account with an unread badge', async () => {
+    expect(await zaloApp.isOpened()).toBe(true);
+    const conversation = await messagesTab.findConversation(OA_NAME);
+    expect(await conversation.isDisplayed()).toBe(true);
+    expect(await messagesTab.hasUnreadBadge(OA_NAME)).toBe(true);
+  });
+});

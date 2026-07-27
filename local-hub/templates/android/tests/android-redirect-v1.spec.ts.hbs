@@ -1,0 +1,29 @@
+import zaloApp from '../pages/zalo-app.page';
+import bottomTabBar from '../pages/bottom-tab-bar.page';
+import messagesTab from '../pages/messages-tab.page';
+import zBusinessChat from '../pages/zbusiness-chat.page';
+
+const test = it;
+const OA_NAME = {{{json oaName}}};
+const EXPECTED_REDIRECT_URL = {{{json expectedRedirectUrl}}};
+const EXPECTED_REDIRECT_DOMAIN = {{{json expectedRedirectDomain}}};
+
+describe('@android OA redirect', () => {
+  beforeEach(async () => {
+    await zaloApp.open();
+    await bottomTabBar.openMessagesTab();
+    await messagesTab.openConversation(OA_NAME);
+    await zBusinessChat.waitForOpened(OA_NAME);
+  });
+
+  after(async () => {
+    await driver.terminateApp(zaloApp.packageName);
+  });
+
+  test('opens the configured redirect domain from the latest card', async () => {
+    expect(new URL(EXPECTED_REDIRECT_URL).hostname).toBe(EXPECTED_REDIRECT_DOMAIN);
+    await zBusinessChat.tapLastCardButton();
+    await driver.pause(1500);
+    expect(await zBusinessChat.getRedirectedDomain()).toBe(EXPECTED_REDIRECT_DOMAIN);
+  });
+});

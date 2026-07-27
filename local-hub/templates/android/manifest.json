@@ -1,0 +1,40 @@
+{
+  "catalogVersion": "android-v1",
+  "templates": [
+    {
+      "id": "android-oa-delivery-v1",
+      "version": 1,
+      "path": "tests/android-oa-delivery-v1.spec.ts.hbs",
+      "sha256": "578a8074cc9c58c27565e70dc798fa815d940632cdee8140b58d2b18a8919132",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "android-thumbnail-v1",
+      "version": 1,
+      "path": "tests/android-thumbnail-v1.spec.ts.hbs",
+      "sha256": "84d686d049ccd8def4d3bcb986e51ca6f66ca89ba0cc48fefe7bbf8f515ab079",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "android-content-v1",
+      "version": 1,
+      "path": "tests/android-content-v1.spec.ts.hbs",
+      "sha256": "e2532e5f248e804748b05a3c2995ea70e80465262b57d793936ec1861a6f53a5",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "android-button-text-v1",
+      "version": 1,
+      "path": "tests/android-button-text-v1.spec.ts.hbs",
+      "sha256": "3a50d4b798c13f5c383d97281911471aa486155ed1e8cb7aa98b396a215c60b7",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "android-redirect-v1",
+      "version": 1,
+      "path": "tests/android-redirect-v1.spec.ts.hbs",
+      "sha256": "ff72c8998ca04de21d7a2392ed26842adf64653946bdc194b99f16c6e3d0852d",
+      "parameterSchema": "template-parameters-v1"
+    }
+  ]
+}

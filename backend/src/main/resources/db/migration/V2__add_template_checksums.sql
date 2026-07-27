@@ -1,0 +1,2 @@
+ALTER TABLE test_cases
+    ADD COLUMN template_sha256 VARCHAR(64) NOT NULL DEFAULT '';
