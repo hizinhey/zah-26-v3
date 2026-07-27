@@ -111,9 +111,10 @@ test("generates a five-case-per-OA plan, confirms it, and starts execution", asy
   await confirm.click();
 
   await expect(page).toHaveURL(/\/execute$/);
-  await expect(page.getByRole("list", { name: "Execution Queue (by OA Sequence)" })).toBeVisible();
-  await expect(page.getByText("OA #1")).toBeVisible();
-  await expect(page.getByText("OA #2")).toBeVisible();
+  const queueList = page.getByRole("list", { name: "Execution Queue (by OA Sequence)" });
+  await expect(queueList).toBeVisible();
+  await expect(queueList.getByText("OA #1")).toBeVisible();
+  await expect(queueList.getByText("OA #2")).toBeVisible();
 
   const start = page.getByRole("button", { name: "Start Execution" });
   await expect(start).toBeEnabled();

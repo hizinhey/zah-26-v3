@@ -24,6 +24,7 @@ def job_offered_payload():
         "idempotencyKey": "run-186a56af-d743-4ffd-8e68-4d034d2927a6",
         "revision": 7,
         "platform": "ANDROID",
+        "leaseToken": "9e2f7c3a-1b4d-4a5e-8f6a-2c7d5e9b1a3f",
         "testCases": [
             {
                 "testCaseId": f"00000000-0000-4000-8000-00000000000{order}",
