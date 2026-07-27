@@ -76,8 +76,9 @@ class EvidenceUploader(Protocol):
 class HttpEvidenceUploader:
     """Uploads evidence via the Task 6 evidence endpoint using httpx."""
 
-    def __init__(self, base_url: str, client=None):
+    def __init__(self, base_url: str, hub_token: str, client=None):
         self._base_url = base_url.rstrip("/")
+        self._hub_token = hub_token
         if client is None:
             import httpx
 
@@ -93,10 +94,11 @@ class HttpEvidenceUploader:
             "declaredSize": evidence.size,
             "declaredSha256": evidence.sha256,
         }
+        headers = {"X-Hub-Token": self._hub_token}
         try:
             with evidence.path.open("rb") as handle:
                 files = {"file": (evidence.path.name, handle)}
-                response = self._client.post(url, params=params, files=files)
+                response = self._client.post(url, params=params, files=files, headers=headers)
         except httpx.HTTPError as exc:
             raise EvidenceUploadError(str(exc)) from exc
         if response.status_code >= 300:

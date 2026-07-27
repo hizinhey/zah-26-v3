@@ -8,9 +8,14 @@ simply causes a harmless resend, never a silent drop.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Protocol
+
+from opshub_hub.transport import PermanentTransportError
+
+logger = logging.getLogger("opshub_hub")
 
 
 class SendsEnvelopes(Protocol):
@@ -53,12 +58,25 @@ class Outbox:
         self._conn.commit()
 
     def flush(self, transport: SendsEnvelopes) -> int:
-        """Send every queued envelope, oldest first, stopping at the first failure
-        so order is preserved. Returns the number of envelopes successfully sent.
-        An entry is removed only after transport.send() returns without raising."""
+        """Send every queued envelope, oldest first, stopping at the first transient
+        failure so order is preserved. Returns the number of envelopes successfully
+        sent. An entry is removed only after transport.send() returns without
+        raising, OR after transport.send() raises PermanentTransportError - a
+        permanent rejection (e.g. HTTP 409 MESSAGE_OUT_OF_ORDER) will never
+        succeed on retry, so the entry is dropped (and logged) instead of being
+        retried forever."""
         sent = 0
         for seq, envelope in self.pending():
-            transport.send(envelope)
+            try:
+                transport.send(envelope)
+            except PermanentTransportError:
+                logger.warning(
+                    "Dropping outbox entry seq=%s (messageId=%s): permanently rejected by transport",
+                    seq,
+                    envelope.get("messageId"),
+                )
+                self._remove(seq)
+                continue
             self._remove(seq)
             sent += 1
         return sent

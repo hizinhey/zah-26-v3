@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import httpx
 
 from opshub_hub.config import HubConfig
-from opshub_hub.transport import TransportError
+from opshub_hub.transport import PermanentTransportError, TransportError
 
 WAIT_SECONDS = 25
 
@@ -52,7 +52,16 @@ class PollingTransport:
     def send(self, envelope: dict) -> None:
         url = self._config.results_url if envelope.get("type") == "TEST_RESULT" else self._config.progress_url
         try:
-            self._client.post(url, headers=self._headers(), json=envelope).raise_for_status()
+            response = self._client.post(url, headers=self._headers(), json=envelope)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            if 400 <= status < 500:
+                # A 4xx means the backend permanently rejected this exact envelope
+                # (e.g. 409 MESSAGE_OUT_OF_ORDER) - resending it unchanged will
+                # never succeed, unlike a 5xx/network failure.
+                raise PermanentTransportError(f"Polling send rejected ({status}): {exc}") from exc
+            raise TransportError(f"Polling send failed: {exc}") from exc
         except httpx.HTTPError as exc:
             raise TransportError(f"Polling send failed: {exc}") from exc
 

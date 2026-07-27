@@ -1,6 +1,7 @@
 import pytest
 
 from opshub_hub.outbox import Outbox
+from opshub_hub.transport import PermanentTransportError
 
 
 class FakeTransport:
@@ -11,6 +12,20 @@ class FakeTransport:
     def send(self, envelope: dict) -> None:
         if self._fail_after is not None and len(self.sent) >= self._fail_after:
             raise RuntimeError("simulated send failure")
+        self.sent.append(envelope)
+
+
+class PermanentlyRejectingTransport:
+    """Simulates a transport whose second message is permanently rejected by the
+    backend (e.g. HTTP 409 MESSAGE_OUT_OF_ORDER) while everything else succeeds."""
+
+    def __init__(self, reject_message_id: str):
+        self.sent: list[dict] = []
+        self._reject_message_id = reject_message_id
+
+    def send(self, envelope: dict) -> None:
+        if envelope["messageId"] == self._reject_message_id:
+            raise PermanentTransportError("409 MESSAGE_OUT_OF_ORDER")
         self.sent.append(envelope)
 
 
@@ -80,3 +95,34 @@ def test_partial_flush_then_retry_preserves_fifo_order(tmp_path):
     transport = FakeTransport()
     outbox.flush(transport)
     assert [e["messageId"] for e in transport.sent] == ["2", "3"]
+
+
+def test_transient_failure_leaves_entry_queued_for_retry(tmp_path):
+    """A 5xx/network failure (generic TransportError via RuntimeError-raising
+    FakeTransport here) is transient - the entry must remain queued."""
+    outbox = make_outbox(tmp_path)
+    outbox.enqueue({"messageId": "1"})
+
+    failing_transport = FakeTransport(fail_after=0)
+    with pytest.raises(RuntimeError):
+        outbox.flush(failing_transport)
+
+    assert len(outbox) == 1
+
+
+def test_permanent_rejection_drops_entry_without_crashing_flush(tmp_path):
+    """A permanently-rejected message (e.g. 409 MESSAGE_OUT_OF_ORDER) must never
+    succeed on retry, so flush() should remove it from the queue, log it, and
+    keep processing later entries instead of raising and stalling the queue."""
+    outbox = make_outbox(tmp_path)
+    outbox.enqueue({"messageId": "1"})
+    outbox.enqueue({"messageId": "2"})
+    outbox.enqueue({"messageId": "3"})
+
+    transport = PermanentlyRejectingTransport(reject_message_id="2")
+    sent_count = outbox.flush(transport)
+
+    # "2" was permanently rejected and dropped; "1" and "3" were sent normally.
+    assert sent_count == 2
+    assert [e["messageId"] for e in transport.sent] == ["1", "3"]
+    assert len(outbox) == 0

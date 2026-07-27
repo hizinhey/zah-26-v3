@@ -28,7 +28,7 @@ logger = logging.getLogger("opshub_hub")
 def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox) -> Runner:
     catalog = TemplateCatalog(config.template_root)
     execution_root = config.data_root / "executions"
-    evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url)
+    evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url, hub_token=config.hub_token)
     # C3 fix: wire real screenshot capture (device-level, via `adb exec-out screencap`) and a
     # real Appium-session reset (via the Appium server's own /sessions HTTP API) into the
     # Runner. Previously neither was passed here, so Runner._capture_and_upload_evidence's
