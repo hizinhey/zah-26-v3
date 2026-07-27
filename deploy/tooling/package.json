@@ -8,6 +8,8 @@
     "@types/node": "20.14.15",
     "@wdio/globals": "9.29.1",
     "@wdio/mocha-framework": "9.30.0",
-    "expect-webdriverio": "5.7.0"
+    "expect-webdriverio": "5.7.0",
+    "sharp": "0.35.3",
+    "pixelmatch": "7.2.0"
   }
 }
