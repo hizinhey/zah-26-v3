@@ -51,12 +51,21 @@ public class FileSystemTemplateReadinessValidator implements TemplateReadinessVa
         }
     }
 
+    @Override
+    public String catalogVersion() {
+        return properties.getCatalogVersion();
+    }
+
     private JsonNode manifestEntry(Path root, TemplateId template) throws IOException {
         Path manifest = root.resolve("manifest.json");
         if (!Files.isRegularFile(manifest)) {
             throw new IllegalStateException("Template manifest is missing");
         }
-        JsonNode entries = objectMapper.readTree(Files.readString(manifest, StandardCharsets.UTF_8)).path("templates");
+        JsonNode catalog = objectMapper.readTree(Files.readString(manifest, StandardCharsets.UTF_8));
+        if (!properties.getCatalogVersion().equals(catalog.path("catalogVersion").asText())) {
+            throw new IllegalStateException("Template manifest catalog version does not match the configured catalog version");
+        }
+        JsonNode entries = catalog.path("templates");
         for (JsonNode entry : entries) {
             if (template.id().equals(entry.path("id").asText())) {
                 if (entry.path("version").asInt(-1) != template.version()

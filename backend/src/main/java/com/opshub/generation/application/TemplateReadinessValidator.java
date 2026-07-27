@@ -9,6 +9,10 @@ public interface TemplateReadinessValidator {
         return (template, parameters) -> Readiness.readyResult();
     }
 
+    default String catalogVersion() {
+        return TemplateReadinessProperties.DEFAULT_CATALOG_VERSION;
+    }
+
     record Readiness(boolean ready, String reason) {
         public static Readiness readyResult() {
             return new Readiness(true, null);

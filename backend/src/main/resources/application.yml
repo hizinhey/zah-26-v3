@@ -23,6 +23,7 @@ opshub:
       max-redirects: 5
   generation:
     templates:
+      catalog-version: ${OPSHUB_TEMPLATE_CATALOG_VERSION:android-v1}
       template-root: ${OPSHUB_TEMPLATE_ROOT:local-hub/templates/android}
       node-executable: ${OPSHUB_NODE_EXECUTABLE:}
       tsc-entry: ${OPSHUB_TSC_ENTRY:}

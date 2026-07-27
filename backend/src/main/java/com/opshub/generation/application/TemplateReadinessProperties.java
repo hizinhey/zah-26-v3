@@ -6,10 +6,21 @@ import java.time.Duration;
 
 @ConfigurationProperties("opshub.generation.templates")
 public class TemplateReadinessProperties {
+    public static final String DEFAULT_CATALOG_VERSION = "android-v1";
+
+    private String catalogVersion = DEFAULT_CATALOG_VERSION;
     private String templateRoot = "local-hub/templates/android";
     private String nodeExecutable = "";
     private String tscEntry = "";
     private Duration compilerTimeout = Duration.ofSeconds(30);
+
+    public String getCatalogVersion() {
+        return catalogVersion;
+    }
+
+    public void setCatalogVersion(String catalogVersion) {
+        this.catalogVersion = catalogVersion;
+    }
 
     public String getTemplateRoot() {
         return templateRoot;

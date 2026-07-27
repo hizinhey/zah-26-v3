@@ -2,6 +2,8 @@ package com.opshub.generation;
 
 import com.opshub.generation.application.TestPlanService;
 import com.opshub.generation.application.TemplateReadinessValidator;
+import com.opshub.generation.application.FileSystemTemplateReadinessValidator;
+import com.opshub.generation.application.TemplateReadinessProperties;
 import com.opshub.generation.domain.TemplateId;
 import com.opshub.operation.application.RevisionConflictException;
 import com.opshub.operation.domain.OfficialAccount;
@@ -10,9 +12,12 @@ import com.opshub.validation.application.ContentParser;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +28,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TestPlanServiceTest {
     private final Operation operation = operationWithOneAccount();
+
+    @TempDir
+    Path tempDirectory;
 
     @Test
     void blocksGenerationUntilEveryCurrentValidationFindingPassed() {
@@ -72,6 +80,31 @@ class TestPlanServiceTest {
         assertThat(plan.cases()).extracting(TestPlanService.TestCaseDto::status)
                 .containsExactly("READY", "READY", "NOT_READY", "READY", "READY");
         assertThat(plan.cases().get(2).readinessReason()).isEqualTo("TypeScript failed");
+    }
+
+    @Test
+    void keepsWrongCatalogVersionCasesNotReadyAndBlocksApproval() throws Exception {
+        Files.writeString(tempDirectory.resolve("manifest.json"), """
+                {"catalogVersion":"android-v2","templates":[]}
+                """);
+        TemplateReadinessProperties properties = new TemplateReadinessProperties();
+        properties.setTemplateRoot(tempDirectory.toString());
+        ApprovalBlockingJdbcTemplate jdbcTemplate = new ApprovalBlockingJdbcTemplate();
+        TestPlanService service = new TestPlanService(
+                entityManagerReturning(operation), jdbcTemplate, new ContentParser(),
+                new FileSystemTemplateReadinessValidator(properties, new com.fasterxml.jackson.databind.ObjectMapper())
+        );
+
+        TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
+
+        assertThat(plan.status()).isEqualTo("GENERATION_FAILED");
+        assertThat(plan.cases()).allSatisfy(testCase -> {
+            assertThat(testCase.status()).isEqualTo("NOT_READY");
+            assertThat(testCase.readinessReason()).contains("catalog version");
+        });
+        assertThatThrownBy(() -> service.approve(plan.planId(), operation.getRevision()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fully ready");
     }
 
     @Test
@@ -168,6 +201,28 @@ class TestPlanServiceTest {
         public int update(String sql, Object... args) {
             updates.add(sql);
             return 1;
+        }
+    }
+
+    private static class ApprovalBlockingJdbcTemplate extends RecordingJdbcTemplate {
+        private ApprovalBlockingJdbcTemplate() {
+            super(1, 0);
+        }
+
+        @Override
+        public int update(String sql, Object... args) {
+            if (sql.contains("UPDATE test_plans plan")) {
+                return 0;
+            }
+            return super.update(sql, args);
+        }
+
+        @Override
+        public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
+            if (sql.contains("JOIN test_plans")) {
+                return requiredType.cast(1);
+            }
+            return super.queryForObject(sql, requiredType, args);
         }
     }
 }

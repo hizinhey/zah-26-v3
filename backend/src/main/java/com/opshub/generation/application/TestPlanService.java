@@ -24,7 +24,6 @@ import java.util.UUID;
 
 @Service
 public class TestPlanService {
-    public static final String CATALOG_VERSION = "android-v1";
 
     private final EntityManager entityManager;
     private final JdbcTemplate jdbcTemplate;
@@ -53,6 +52,7 @@ public class TestPlanService {
             throw new RevisionConflictException(operation.getRevision());
         }
         requireFullyPassedValidation(operationId, revision);
+        String catalogVersion = templateReadinessValidator.catalogVersion();
 
         UUID planId = UUID.randomUUID();
         List<TestCaseDto> cases = createCases(operation, planId);
@@ -60,7 +60,7 @@ public class TestPlanService {
         jdbcTemplate.update("""
                         INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
                         VALUES (?, ?, ?, ?, ?, 'PENDING')
-                        """, planId, operationId, revision, CATALOG_VERSION, planStatus);
+                        """, planId, operationId, revision, catalogVersion, planStatus);
         for (TestCaseDto testCase : cases) {
             jdbcTemplate.update("""
                             INSERT INTO test_cases (id, plan_id, oa_order, case_order, template_id, template_version, template_sha256, parameters, status)
@@ -77,7 +77,7 @@ public class TestPlanService {
         if (updated == 0) {
             throw new RevisionConflictException(currentRevision(operationId));
         }
-        return new TestPlanDto(planId, operationId, revision, CATALOG_VERSION, planStatus, "PENDING", List.copyOf(cases));
+        return new TestPlanDto(planId, operationId, revision, catalogVersion, planStatus, "PENDING", List.copyOf(cases));
     }
 
     @Transactional
