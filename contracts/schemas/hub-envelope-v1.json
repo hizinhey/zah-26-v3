@@ -74,63 +74,43 @@
     "TestCase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["testCaseId", "order", "templateId", "templateVersion", "parameters"],
+      "required": ["testCaseId", "oaOrder", "oaName", "order", "templateId", "templateVersion", "parameters"],
       "properties": {
         "testCaseId": { "$ref": "#/$defs/Uuid" },
-        "order": { "type": "integer", "minimum": 1 },
-        "templateId": { "type": "string", "minLength": 1 },
+        "oaOrder": { "type": "integer", "minimum": 1 },
+        "oaName": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "templateId": {
+          "type": "string",
+          "enum": [
+            "android-oa-delivery-v1",
+            "android-thumbnail-v1",
+            "android-content-v1",
+            "android-button-text-v1",
+            "android-redirect-v1"
+          ]
+        },
         "templateVersion": { "type": "integer", "minimum": 1 },
         "parameters": { "$ref": "#/$defs/TemplateParametersV1" }
       }
     },
     "OrderedTestCases": {
+      "description": "N groups of exactly 5 test cases, one group per OA, grouped by oaOrder (ascending, contiguous from 1). Within each group, `order` runs 1-5 with a fixed templateId per position - see ORDERED_TEST_CASE_TEMPLATE_IDS in local-hub/src/opshub_hub/models.py and the equivalent check in ExecutionServiceContractTest for the position->templateId mapping enforced in code (not fully expressible in pure JSON Schema across group boundaries).",
       "type": "array",
       "minItems": 5,
-      "maxItems": 5,
-      "prefixItems": [
-        {
-          "allOf": [
-            { "$ref": "#/$defs/TestCase" },
-            { "properties": { "order": { "const": 1 }, "templateId": { "const": "android-oa-delivery-v1" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/TestCase" },
-            { "properties": { "order": { "const": 2 }, "templateId": { "const": "android-thumbnail-v1" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/TestCase" },
-            { "properties": { "order": { "const": 3 }, "templateId": { "const": "android-content-v1" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/TestCase" },
-            { "properties": { "order": { "const": 4 }, "templateId": { "const": "android-button-text-v1" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/TestCase" },
-            { "properties": { "order": { "const": 5 }, "templateId": { "const": "android-redirect-v1" } } }
-          ]
-        }
-      ],
-      "items": false
+      "items": { "$ref": "#/$defs/TestCase" }
     },
     "JobOfferedPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["executionId", "idempotencyKey", "revision", "platform", "testCases"],
+      "required": ["executionId", "idempotencyKey", "revision", "platform", "testCases", "leaseToken"],
       "properties": {
         "executionId": { "$ref": "#/$defs/Uuid" },
         "idempotencyKey": { "type": "string", "minLength": 1 },
         "revision": { "$ref": "#/$defs/Revision" },
         "platform": { "const": "ANDROID" },
-        "testCases": { "$ref": "#/$defs/OrderedTestCases" }
+        "testCases": { "$ref": "#/$defs/OrderedTestCases" },
+        "leaseToken": { "$ref": "#/$defs/Uuid" }
       }
     },
     "JobProgressPayload": {

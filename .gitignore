@@ -86,3 +86,9 @@ generated-tests/
 local-hub/generated-tests/
 local-hub/.outbox/
 local-hub/.journal/
+
+# Deployment secrets (never commit real values; keep the .example file)
+deploy/env/backend.env
+deploy/env/*.env
+!deploy/env/*.env.example
+deploy/.env

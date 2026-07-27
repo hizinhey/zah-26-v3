@@ -1,0 +1,46 @@
+.issue {
+  display: flex;
+  gap: var(--ops-space-3);
+  padding: var(--ops-space-4) 0;
+  border-bottom: 1px solid var(--ops-color-gray-200);
+  list-style: none;
+}
+
+.issue:last-child {
+  border-bottom: none;
+}
+
+.number {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ops-radius-pill);
+  background: var(--ops-color-orange-500);
+  color: var(--ops-color-white);
+  font-size: var(--ops-font-size-xs);
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-1);
+}
+
+.title {
+  font-weight: var(--ops-font-weight-semibold);
+  color: var(--ops-color-gray-900);
+}
+
+.detail {
+  color: var(--ops-color-gray-500);
+  font-size: var(--ops-font-size-sm);
+}
+
+.link {
+  color: var(--ops-color-blue-600);
+  font-weight: var(--ops-font-weight-medium);
+}

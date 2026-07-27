@@ -1,0 +1,99 @@
+/*
+ * Visual tokens extracted from the OpsHub mockups:
+ * 1. Input OA Details, 2. Verify Inputs, 3. Generate Test Cases, 4. Confirm & Start Execution.
+ * The sidebar shown in the mockups is intentionally omitted from the MVP.
+ */
+:root {
+  /* Layout */
+  --ops-content-max-width: 1200px;
+  --ops-content-padding-x: 32px;
+  --ops-content-padding-y: 24px;
+
+  /* Palette: blue (primary/info), green (success), orange (warning), red (danger), gray (neutral) */
+  --ops-color-blue-50: #eaf1ff;
+  --ops-color-blue-100: #dbe9ff;
+  --ops-color-blue-500: #2f6bff;
+  --ops-color-blue-600: #1f56e0;
+  --ops-color-blue-700: #17408f;
+
+  --ops-color-green-50: #e8f7ee;
+  --ops-color-green-100: #d4f2df;
+  --ops-color-green-500: #1fa15a;
+  --ops-color-green-600: #16843f;
+
+  --ops-color-orange-50: #fff2e6;
+  --ops-color-orange-100: #ffe3c2;
+  --ops-color-orange-500: #e8791b;
+  --ops-color-orange-600: #c2620f;
+
+  --ops-color-red-50: #fdeceb;
+  --ops-color-red-100: #fbd7d4;
+  --ops-color-red-500: #d93a2b;
+  --ops-color-red-600: #b32c20;
+
+  --ops-color-gray-50: #f7f8fa;
+  --ops-color-gray-100: #eef0f3;
+  --ops-color-gray-200: #e2e5ea;
+  --ops-color-gray-300: #ccd1d9;
+  --ops-color-gray-500: #6b7280;
+  --ops-color-gray-700: #3c4250;
+  --ops-color-gray-900: #1a1f2b;
+
+  --ops-color-white: #ffffff;
+
+  /* Semantic status colors (map to FieldStatus / OperationStatus / TestCaseStatus / TestResultStatus) */
+  --ops-status-success-bg: var(--ops-color-green-50);
+  --ops-status-success-fg: var(--ops-color-green-600);
+  --ops-status-warning-bg: var(--ops-color-orange-50);
+  --ops-status-warning-fg: var(--ops-color-orange-600);
+  --ops-status-danger-bg: var(--ops-color-red-50);
+  --ops-status-danger-fg: var(--ops-color-red-600);
+  --ops-status-info-bg: var(--ops-color-blue-50);
+  --ops-status-info-fg: var(--ops-color-blue-600);
+  --ops-status-neutral-bg: var(--ops-color-gray-100);
+  --ops-status-neutral-fg: var(--ops-color-gray-700);
+
+  /* Border radii */
+  --ops-radius-sm: 6px;
+  --ops-radius-md: 10px;
+  --ops-radius-lg: 14px;
+  --ops-radius-pill: 999px;
+
+  /* Shadows */
+  --ops-shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --ops-shadow-focus: 0 0 0 3px rgba(47, 107, 255, 0.35);
+
+  /* Typography */
+  --ops-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ops-font-size-xs: 12px;
+  --ops-font-size-sm: 13px;
+  --ops-font-size-md: 15px;
+  --ops-font-size-lg: 18px;
+  --ops-font-size-xl: 22px;
+  --ops-font-size-2xl: 30px;
+  --ops-line-height-normal: 1.5;
+  --ops-font-weight-regular: 400;
+  --ops-font-weight-medium: 500;
+  --ops-font-weight-semibold: 600;
+  --ops-font-weight-bold: 700;
+
+  /* Spacing scale */
+  --ops-space-1: 4px;
+  --ops-space-2: 8px;
+  --ops-space-3: 12px;
+  --ops-space-4: 16px;
+  --ops-space-5: 20px;
+  --ops-space-6: 24px;
+  --ops-space-8: 32px;
+  --ops-space-10: 40px;
+
+  /* Stepper (StepProgress) */
+  --ops-step-circle-size: 36px;
+  --ops-step-connector-height: 2px;
+
+  /* Table / list rows */
+  --ops-row-height: 56px;
+
+  /* Interactive targets */
+  --ops-min-target-size: 44px;
+}

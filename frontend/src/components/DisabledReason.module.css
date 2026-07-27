@@ -1,0 +1,13 @@
+.wrapper {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--ops-space-2);
+}
+
+.reason {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-2);
+  color: var(--ops-color-gray-500);
+  font-size: var(--ops-font-size-sm);
+}

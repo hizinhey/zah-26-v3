@@ -1,0 +1,28 @@
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-2);
+  margin-top: var(--ops-space-2);
+  padding: var(--ops-space-3);
+  background: var(--ops-color-gray-50);
+  border-radius: var(--ops-radius-sm);
+  font-size: var(--ops-font-size-sm);
+}
+
+.row {
+  display: flex;
+  gap: var(--ops-space-2);
+  align-items: baseline;
+}
+
+.label {
+  flex: 0 0 auto;
+  color: var(--ops-color-gray-500);
+  font-weight: var(--ops-font-weight-medium);
+}
+
+.value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ops-color-gray-900);
+}

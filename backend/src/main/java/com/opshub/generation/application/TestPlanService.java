@@ -10,6 +10,7 @@ import com.opshub.operation.domain.Operation;
 import com.opshub.operation.domain.OperationStatus;
 import com.opshub.validation.application.ContentParser;
 import jakarta.persistence.EntityManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class TestPlanService {
     private final ObjectMapper objectMapper;
     private final TemplateReadinessValidator templateReadinessValidator;
 
+    @Autowired
     public TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser,
                            TemplateReadinessValidator templateReadinessValidator) {
         this(entityManager, jdbcTemplate, contentParser, templateReadinessValidator, new ObjectMapper());
@@ -78,6 +80,41 @@ public class TestPlanService {
             throw new RevisionConflictException(currentRevision(operationId));
         }
         return new TestPlanDto(planId, operationId, revision, catalogVersion, planStatus, "PENDING", List.copyOf(cases));
+    }
+
+    public TestPlanDto findById(UUID planId) {
+        TestPlanRow plan = jdbcTemplate.query("""
+                        SELECT id, operation_id, source_revision, template_catalog_version, status, approval_status
+                        FROM test_plans WHERE id = ?
+                        """, rs -> rs.next()
+                        ? new TestPlanRow((UUID) rs.getObject("id"), (UUID) rs.getObject("operation_id"),
+                                rs.getInt("source_revision"), rs.getString("template_catalog_version"),
+                                rs.getString("status"), rs.getString("approval_status"))
+                        : null,
+                planId);
+        if (plan == null) {
+            throw new TestPlanNotFoundException(planId);
+        }
+        List<TestCaseDto> cases = jdbcTemplate.query("""
+                        SELECT id, plan_id, oa_order, case_order, template_id, template_version, template_sha256, parameters, status
+                        FROM test_cases WHERE plan_id = ? ORDER BY oa_order, case_order
+                        """, (rs, rowNum) -> {
+                    try {
+                        Object parameters = objectMapper.readValue(rs.getString("parameters"), TemplateParameters.class);
+                        return new TestCaseDto(
+                                (UUID) rs.getObject("id"), (UUID) rs.getObject("plan_id"), rs.getInt("oa_order"), rs.getInt("case_order"),
+                                rs.getString("template_id"), rs.getInt("template_version"), rs.getString("template_sha256"),
+                                (TemplateParameters) parameters, rs.getString("status"), null);
+                    } catch (JsonProcessingException exception) {
+                        throw new IllegalStateException("Could not parse stored template parameters", exception);
+                    }
+                }, planId);
+        return new TestPlanDto(plan.id(), plan.operationId(), plan.sourceRevision(), plan.templateCatalogVersion(),
+                plan.status(), plan.approvalStatus(), cases);
+    }
+
+    private record TestPlanRow(UUID id, UUID operationId, int sourceRevision, String templateCatalogVersion,
+                                String status, String approvalStatus) {
     }
 
     @Transactional

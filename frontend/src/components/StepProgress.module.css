@@ -1,0 +1,68 @@
+.list {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ops-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-3);
+  flex: 1;
+}
+
+.circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ops-step-circle-size);
+  height: var(--ops-step-circle-size);
+  min-width: var(--ops-step-circle-size);
+  border-radius: var(--ops-radius-pill);
+  border: 2px solid var(--ops-color-gray-300);
+  background: var(--ops-color-white);
+  color: var(--ops-color-gray-500);
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.labels {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: var(--ops-font-size-md);
+  font-weight: var(--ops-font-weight-semibold);
+  color: var(--ops-color-gray-900);
+}
+
+.connector {
+  flex: 1;
+  height: var(--ops-step-connector-height);
+  background: var(--ops-color-gray-300);
+  margin-top: calc(var(--ops-step-circle-size) / 2);
+}
+
+.upcoming .circle {
+  border-color: var(--ops-color-gray-300);
+  color: var(--ops-color-gray-500);
+}
+
+.current .circle {
+  border-color: var(--ops-color-blue-500);
+  background: var(--ops-color-blue-500);
+  color: var(--ops-color-white);
+}
+
+.completed .circle {
+  border-color: var(--ops-color-green-500);
+  background: var(--ops-color-green-50);
+  color: var(--ops-color-green-600);
+}
+
+.completedConnector {
+  background: var(--ops-color-green-500);
+}

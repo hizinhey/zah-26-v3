@@ -1,0 +1,201 @@
+.conflict {
+  margin-top: var(--ops-space-4);
+  padding: var(--ops-space-3);
+  background: var(--ops-status-danger-bg);
+  color: var(--ops-status-danger-fg);
+  border-radius: var(--ops-radius-md);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: var(--ops-space-6);
+  align-items: start;
+  margin-top: var(--ops-space-6);
+}
+
+.queuePanel,
+.runPanel {
+  border: 1px solid var(--ops-color-gray-200);
+  border-radius: var(--ops-radius-md);
+  background: var(--ops-color-white);
+  padding: var(--ops-space-4) var(--ops-space-5);
+}
+
+.panelTitle {
+  font-size: var(--ops-font-size-lg);
+  font-weight: var(--ops-font-weight-semibold);
+  margin: 0 0 var(--ops-space-4);
+}
+
+.queueList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-4);
+}
+
+.queueItem {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-3);
+  border: 1px solid var(--ops-color-gray-200);
+  border-radius: var(--ops-radius-md);
+  padding: var(--ops-space-3);
+}
+
+.queueItemActive {
+  border-color: var(--ops-color-blue-500);
+  background: var(--ops-color-blue-50);
+}
+
+.queueIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--ops-color-gray-100);
+  color: var(--ops-color-gray-700);
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.queueBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.queueTitle {
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.queuePlatform {
+  color: var(--ops-color-gray-500);
+  font-size: var(--ops-font-size-sm);
+}
+
+.runHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ops-space-4);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-4);
+  margin-bottom: var(--ops-space-4);
+}
+
+.progressBar {
+  flex: 1;
+  height: 8px;
+  background: var(--ops-color-gray-100);
+  border-radius: var(--ops-radius-sm);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--ops-color-blue-500);
+}
+
+.summary {
+  padding: var(--ops-space-3);
+  background: var(--ops-status-info-bg);
+  color: var(--ops-status-info-fg);
+  border-radius: var(--ops-radius-md);
+  margin-bottom: var(--ops-space-4);
+}
+
+.pollingNotice {
+  color: var(--ops-color-gray-500);
+  font-size: var(--ops-font-size-sm);
+  margin-bottom: var(--ops-space-4);
+}
+
+.notice {
+  padding: var(--ops-space-4);
+  background: var(--ops-status-info-bg);
+  color: var(--ops-status-info-fg);
+  border-radius: var(--ops-radius-md);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--ops-space-5);
+  border-bottom: 1px solid var(--ops-color-gray-200);
+  margin-bottom: var(--ops-space-4);
+}
+
+.tab {
+  border: none;
+  background: none;
+  padding: var(--ops-space-2) 0;
+  cursor: pointer;
+  color: var(--ops-color-gray-500);
+  border-bottom: 2px solid transparent;
+  min-height: var(--ops-min-target-size);
+}
+
+.tabActive {
+  color: var(--ops-color-blue-600);
+  border-bottom-color: var(--ops-color-blue-600);
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  text-align: left;
+  color: var(--ops-color-gray-500);
+  font-weight: var(--ops-font-weight-medium);
+  font-size: var(--ops-font-size-sm);
+  padding-bottom: var(--ops-space-3);
+}
+
+.table td {
+  padding: var(--ops-space-3) 0;
+  border-top: 1px solid var(--ops-color-gray-200);
+}
+
+.attempt {
+  color: var(--ops-color-gray-500);
+  font-size: var(--ops-font-size-sm);
+}
+
+.empty {
+  color: var(--ops-color-gray-500);
+}
+
+.scriptList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-4);
+}
+
+.scriptList dt {
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.scriptList dd {
+  margin: 0;
+  color: var(--ops-color-gray-700);
+}
+
+.evidenceUnavailable {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ops-color-gray-500);
+  cursor: not-allowed;
+  text-decoration: underline dotted;
+}

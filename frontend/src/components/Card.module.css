@@ -1,0 +1,13 @@
+.card {
+  background: var(--ops-color-white);
+  border: 1px solid var(--ops-color-gray-200);
+  border-radius: var(--ops-radius-lg);
+  box-shadow: var(--ops-shadow-card);
+  padding: var(--ops-space-6);
+}
+
+.title {
+  font-size: var(--ops-font-size-lg);
+  font-weight: var(--ops-font-weight-semibold);
+  margin: 0 0 var(--ops-space-4) 0;
+}

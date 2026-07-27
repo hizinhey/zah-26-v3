@@ -1,0 +1,11 @@
+-- Enforces "one active lease per Hub" at the database level, not just via the in-process
+-- ReentrantLock in ExecutionService#offerNextJob (which only protects a single JVM instance).
+--
+-- LeaseService#acquire always deletes a Hub's expired lease rows before inserting a new one, so in
+-- steady state there is at most one job_leases row per hub_id. A plain (non-partial) unique
+-- constraint is sufficient here - Postgres partial-index predicates must be immutable and cannot
+-- reference now(), so time-based expiry cannot be encoded directly in the index. If a second
+-- backend instance races to insert a lease for the same Hub before its expired row is cleaned up,
+-- the unique constraint rejects the second INSERT; LeaseService/ExecutionService treat that failure
+-- the same as "nothing to offer right now".
+ALTER TABLE job_leases ADD CONSTRAINT job_leases_hub_id_unique UNIQUE (hub_id);
