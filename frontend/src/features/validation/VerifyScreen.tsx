@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { StepProgress } from "../../components/StepProgress";
 import { Card } from "../../components/Card";
@@ -7,6 +7,7 @@ import { DisabledReason } from "../../components/DisabledReason";
 import { OPERATION_STEPS } from "../../app/router";
 import type { FieldFinding } from "../../api/generated";
 import {
+  isRevisionConflict,
   useOperationQuery,
   useValidateOperationMutation,
   useValidationQuery,
@@ -14,6 +15,10 @@ import {
 import { ValidationFinding, parseOaFieldName, type OaFieldIssue } from "./ValidationFinding";
 import styles from "./VerifyScreen.module.css";
 
+// Display-only aggregation: this ranking is a client-side convenience for
+// summarizing findings per OA in the table below. It does not gate
+// navigation — the actual Generate gate always reads the API's
+// `canGenerate`/`generateDisabledReasons` directly and never recomputes it.
 const STATUS_SEVERITY: Record<string, number> = {
   FAILED: 4,
   INVALID: 4,
@@ -80,6 +85,7 @@ export function VerifyScreen(): ReactElement {
   const operationQuery = useOperationQuery(operationId);
   const validationQuery = useValidationQuery(operationId);
   const revalidate = useValidateOperationMutation(operationId);
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
   const validationRun = validationQuery.data;
   const rows = useMemo(
@@ -105,10 +111,23 @@ export function VerifyScreen(): ReactElement {
         : (validationRun.generateDisabledReasons[0] ??
           "Generate is only enabled once every OA has passed AI validation.");
 
-  function handleRecheck(): void {
+  async function handleRecheck(): Promise<void> {
+    setConflictMessage(null);
     const revision = operationQuery.data?.revision;
-    if (revision !== undefined) {
-      revalidate.mutate(revision);
+    if (revision === undefined) {
+      return;
+    }
+    try {
+      await revalidate.mutateAsync(revision);
+    } catch (error) {
+      if (isRevisionConflict(error)) {
+        setConflictMessage(
+          `This operation changed elsewhere (current revision ${error.body.currentRevision}). Refresh and try again.`,
+        );
+        await operationQuery.refetch();
+        return;
+      }
+      throw error;
     }
   }
 
@@ -122,6 +141,12 @@ export function VerifyScreen(): ReactElement {
     <div>
       <h1 className="ops-page-title">Test Operations</h1>
       <StepProgress steps={OPERATION_STEPS} currentStepId="verify" />
+
+      {conflictMessage ? (
+        <p className={styles.conflict} role="alert">
+          {conflictMessage}
+        </p>
+      ) : null}
 
       {validationRun && validationRun.status === "VALIDATION_FAILED" ? (
         <div className={styles.issueBanner} role="alert">

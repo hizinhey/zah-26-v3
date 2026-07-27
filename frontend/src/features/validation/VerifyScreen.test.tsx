@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { VerifyScreen } from "./VerifyScreen";
+import { ApiClientError } from "../../api/client";
 import type { Operation, ValidationRun } from "../../api/generated";
 import { operationQueryKey, validationQueryKey } from "../operations/useOperation";
 
@@ -148,5 +149,25 @@ describe("VerifyScreen", () => {
       expect(mocks.validateOperation).toHaveBeenCalledWith("op-1", { expectedRevision: 2 }),
     );
     await waitFor(() => expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled());
+  });
+
+  it("surfaces a conflict message and refetches instead of leaving stale results on a stale re-check", async () => {
+    const user = userEvent.setup();
+    mocks.validateOperation.mockRejectedValueOnce(
+      new ApiClientError(
+        409,
+        { code: "REVISION_CONFLICT", message: "stale", currentRevision: 5 },
+        "stale",
+      ),
+    );
+    renderScreen(failedRun, operation({ revision: 2 }));
+
+    await user.click(screen.getByRole("button", { name: "Re-check" }));
+
+    expect(await screen.findByText(/current revision 5/)).toBeInTheDocument();
+    // No incorrect state left displayed: the stale failedRun rows are still
+    // showing (no crash / no bogus success), and Generate stays gated.
+    expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+    await waitFor(() => expect(mocks.getOperation).toHaveBeenCalledTimes(2));
   });
 });
