@@ -1,5 +1,7 @@
 import type { ReactElement } from "react";
 import { Navigate, Outlet, createBrowserRouter, useParams } from "react-router-dom";
+import { InputScreen } from "../features/operations/InputScreen";
+import { VerifyScreen } from "../features/validation/VerifyScreen";
 
 export type OperationStepId = "input" | "verify" | "generate" | "execute";
 
@@ -46,8 +48,8 @@ export const router = createBrowserRouter([
     element: <OperationLayout />,
     children: [
       { index: true, element: <Navigate to="input" replace /> },
-      { path: "input", element: <StepPlaceholder label="Input OA Details" /> },
-      { path: "verify", element: <StepPlaceholder label="Verify Inputs" /> },
+      { path: "input", element: <InputScreen /> },
+      { path: "verify", element: <VerifyScreen /> },
       { path: "generate", element: <StepPlaceholder label="Generate Test Cases" /> },
       { path: "execute", element: <StepPlaceholder label="Confirm & Start Execution" /> },
     ],

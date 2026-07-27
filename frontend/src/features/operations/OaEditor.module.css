@@ -1,0 +1,73 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-5);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-2);
+}
+
+.fieldLabelWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-2);
+}
+
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ops-space-2);
+  font-weight: var(--ops-font-weight-semibold);
+  color: var(--ops-color-gray-900);
+}
+
+.fieldNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--ops-radius-pill);
+  background: var(--ops-color-blue-500);
+  color: var(--ops-color-white);
+  font-size: var(--ops-font-size-xs);
+  font-weight: var(--ops-font-weight-semibold);
+}
+
+.platformBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ops-space-2);
+  width: fit-content;
+  padding: var(--ops-space-2) var(--ops-space-4);
+  border: 1px solid var(--ops-color-blue-500);
+  border-radius: var(--ops-radius-md);
+  background: var(--ops-color-blue-50);
+  color: var(--ops-color-blue-600);
+  font-weight: var(--ops-font-weight-medium);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: var(--ops-space-3);
+  border: 1px solid var(--ops-color-gray-300);
+  border-radius: var(--ops-radius-md);
+  font-family: var(--ops-font-family);
+  font-size: var(--ops-font-size-md);
+  color: var(--ops-color-gray-900);
+  min-height: var(--ops-min-target-size);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.charCount {
+  align-self: flex-end;
+  font-size: var(--ops-font-size-xs);
+  color: var(--ops-color-gray-500);
+}

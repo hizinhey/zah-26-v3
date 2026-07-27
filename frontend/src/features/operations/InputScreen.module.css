@@ -1,0 +1,127 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--ops-space-6);
+  align-items: start;
+  margin-top: var(--ops-space-6);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-2);
+  margin-bottom: var(--ops-space-5);
+}
+
+.label {
+  font-weight: var(--ops-font-weight-semibold);
+  color: var(--ops-color-gray-900);
+}
+
+.input {
+  padding: var(--ops-space-3);
+  border: 1px solid var(--ops-color-gray-300);
+  border-radius: var(--ops-radius-md);
+  font-size: var(--ops-font-size-md);
+  min-height: var(--ops-min-target-size);
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-3);
+  border-bottom: 1px solid var(--ops-color-gray-200);
+  margin-bottom: var(--ops-space-5);
+  flex-wrap: wrap;
+}
+
+.tabGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-1);
+}
+
+.tab {
+  padding: var(--ops-space-2) var(--ops-space-1);
+  border: none;
+  background: none;
+  font-weight: var(--ops-font-weight-medium);
+  color: var(--ops-color-gray-500);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tabActive {
+  color: var(--ops-color-blue-600);
+  border-bottom-color: var(--ops-color-blue-500);
+}
+
+.tabActions {
+  display: inline-flex;
+  gap: var(--ops-space-1);
+}
+
+.tabActionButton {
+  border: 1px solid var(--ops-color-gray-200);
+  background: var(--ops-color-white);
+  border-radius: var(--ops-radius-sm);
+  cursor: pointer;
+  font-size: var(--ops-font-size-xs);
+  line-height: 1;
+  padding: var(--ops-space-1) var(--ops-space-2);
+}
+
+.tabActionButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.addOa {
+  margin-left: auto;
+  border: 1px solid var(--ops-color-blue-500);
+  color: var(--ops-color-blue-600);
+  background: var(--ops-color-white);
+  border-radius: var(--ops-radius-md);
+  padding: var(--ops-space-2) var(--ops-space-3);
+  cursor: pointer;
+}
+
+.hint {
+  margin-top: var(--ops-space-5);
+  padding: var(--ops-space-4);
+  background: var(--ops-color-gray-50);
+  border-radius: var(--ops-radius-md);
+  color: var(--ops-color-gray-700);
+  font-size: var(--ops-font-size-sm);
+}
+
+.conflict {
+  margin-top: var(--ops-space-4);
+  padding: var(--ops-space-3);
+  background: var(--ops-status-danger-bg);
+  color: var(--ops-status-danger-fg);
+  border-radius: var(--ops-radius-md);
+}
+
+.overview {
+  background: var(--ops-color-gray-50);
+}
+
+.overviewRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-1);
+  padding: var(--ops-space-4) 0;
+  border-bottom: 1px solid var(--ops-color-gray-200);
+  font-size: var(--ops-font-size-lg);
+}
+
+.overviewRow:last-child {
+  border-bottom: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--ops-space-6);
+}
