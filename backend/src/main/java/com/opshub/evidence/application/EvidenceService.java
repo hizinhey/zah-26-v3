@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -120,5 +122,51 @@ public class EvidenceService {
             throw new EvidenceValidationException("Unsupported file type: " + extension);
         }
         return extension;
+    }
+
+    public record EvidenceSummary(UUID id, String evidenceType, long sizeBytes, String checksum, Instant createdAt) {
+    }
+
+    public record EvidenceContent(byte[] bytes, String contentType) {
+    }
+
+    public List<EvidenceSummary> listForTestResult(UUID testResultId) {
+        return jdbcTemplate.query("""
+                        SELECT id, evidence_type, size_bytes, checksum, created_at
+                        FROM evidence WHERE test_result_id = ? ORDER BY created_at
+                        """, (rs, rowNum) -> new EvidenceSummary(
+                        (UUID) rs.getObject("id"), rs.getString("evidence_type"), rs.getLong("size_bytes"),
+                        rs.getString("checksum"), rs.getTimestamp("created_at").toInstant()),
+                testResultId);
+    }
+
+    public EvidenceContent loadContent(UUID evidenceId) {
+        String relativePath = jdbcTemplate.query("SELECT relative_path FROM evidence WHERE id = ?",
+                rs -> rs.next() ? rs.getString("relative_path") : null, evidenceId);
+        if (relativePath == null) {
+            throw new EvidenceNotFoundException(evidenceId);
+        }
+        Path path = evidenceRoot.resolve(relativePath).normalize();
+        if (!path.startsWith(evidenceRoot)) {
+            throw new EvidenceNotFoundException(evidenceId);
+        }
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(path);
+        } catch (IOException exception) {
+            throw new EvidenceNotFoundException(evidenceId);
+        }
+        return new EvidenceContent(bytes, contentTypeFor(path.getFileName().toString()));
+    }
+
+    private static String contentTypeFor(String filename) {
+        int dot = filename.lastIndexOf('.');
+        String extension = dot < 0 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return switch (extension) {
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "log", "txt" -> "text/plain";
+            default -> "application/octet-stream";
+        };
     }
 }

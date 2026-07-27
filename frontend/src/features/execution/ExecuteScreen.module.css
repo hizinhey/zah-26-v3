@@ -191,11 +191,12 @@
   color: var(--ops-color-gray-700);
 }
 
-.evidenceUnavailable {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--ops-color-gray-500);
-  cursor: not-allowed;
-  text-decoration: underline dotted;
+.evidenceButton {
+  border: 1px solid var(--ops-color-blue-500);
+  color: var(--ops-color-blue-600);
+  background: var(--ops-color-white);
+  border-radius: var(--ops-radius-md);
+  padding: var(--ops-space-2) var(--ops-space-4);
+  cursor: pointer;
+  min-height: var(--ops-min-target-size);
 }

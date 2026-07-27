@@ -13,6 +13,7 @@ import { useExecutionChannel } from "../../realtime/useExecutionChannel";
 import { applyEnvelope, hydrateFromResults, seedExecutionState, type ExecutionState } from "./executionState";
 import { ExecutionQueue, type QueueOa, type QueueStatus } from "./ExecutionQueue";
 import { ExecutionLog } from "./ExecutionLog";
+import { EvidenceModal } from "./EvidenceModal";
 import { TEST_CASE_CATALOG, testCaseLabel } from "../generation/testCaseCatalog";
 import type { ExecutionTestResult, GeneratedTestCase, HubEnvelopeV1 } from "../../api/generated";
 import styles from "./ExecuteScreen.module.css";
@@ -76,6 +77,7 @@ export function ExecuteScreen(): ReactElement {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE_FROM(planQuery.data?.testCases ?? []));
   const [tab, setTab] = useState<Tab>("current");
   const [startError, setStartError] = useState<string | null>(null);
+  const [evidenceTestResultId, setEvidenceTestResultId] = useState<string | null>(null);
 
   const plan = planQuery.data;
   const execution = executionQuery.data;
@@ -288,14 +290,22 @@ export function ExecuteScreen(): ReactElement {
                           <td>{live?.durationMs != null ? `${(live.durationMs / 1000).toFixed(2)}s` : "—"}</td>
                           <td>
                             {isFailure ? (
-                              <button
-                                type="button"
-                                className={styles.evidenceUnavailable}
-                                disabled
-                                title="Evidence viewing isn't available yet. Evidence is captured on the Hub and can currently only be inspected there."
-                              >
-                                View Evidence
-                              </button>
+                              (() => {
+                                const result = (execution?.results ?? [])
+                                  .filter((candidate) => candidate.testCaseId === testCase.testCaseId)
+                                  .sort((a, b) => b.attempt - a.attempt)[0];
+                                return result ? (
+                                  <button
+                                    type="button"
+                                    className={styles.evidenceButton}
+                                    onClick={() => setEvidenceTestResultId(result.id)}
+                                  >
+                                    View Evidence
+                                  </button>
+                                ) : (
+                                  "—"
+                                );
+                              })()
                             ) : (
                               "—"
                             )}
@@ -336,6 +346,10 @@ export function ExecuteScreen(): ReactElement {
           )}
         </section>
       </div>
+
+      {evidenceTestResultId ? (
+        <EvidenceModal testResultId={evidenceTestResultId} onClose={() => setEvidenceTestResultId(null)} />
+      ) : null}
     </div>
   );
 }

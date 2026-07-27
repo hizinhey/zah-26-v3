@@ -1,5 +1,6 @@
 package com.opshub.evidence;
 
+import com.opshub.evidence.application.EvidenceNotFoundException;
 import com.opshub.evidence.application.EvidenceProperties;
 import com.opshub.evidence.application.EvidenceService;
 import com.opshub.evidence.application.EvidenceValidationException;
@@ -21,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,5 +130,59 @@ class EvidenceServiceTest {
 
     private static String sha256Hex(byte[] content) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+    }
+
+    @Test
+    void listForTestResultReturnsEmptyListWhenNoneExist() {
+        assertThat(evidenceService.listForTestResult(testResultId)).isEmpty();
+    }
+
+    @Test
+    void listForTestResultReturnsStoredMetadataOrderedByCreation() throws Exception {
+        byte[] first = "first-shot".getBytes(StandardCharsets.UTF_8);
+        byte[] second = "second-shot".getBytes(StandardCharsets.UTF_8);
+        UUID firstId = evidenceService.store(testResultId, "SCREENSHOT", "a.png",
+                first.length, sha256Hex(first), new ByteArrayInputStream(first));
+        UUID secondId = evidenceService.store(testResultId, "SCREENSHOT", "b.png",
+                second.length, sha256Hex(second), new ByteArrayInputStream(second));
+
+        List<EvidenceService.EvidenceSummary> items = evidenceService.listForTestResult(testResultId);
+
+        assertThat(items).extracting(EvidenceService.EvidenceSummary::id).containsExactly(firstId, secondId);
+        assertThat(items).extracting(EvidenceService.EvidenceSummary::evidenceType).containsOnly("SCREENSHOT");
+        assertThat(items).extracting(EvidenceService.EvidenceSummary::sizeBytes)
+                .containsExactly((long) first.length, (long) second.length);
+        assertThat(items).extracting(EvidenceService.EvidenceSummary::createdAt).allSatisfy(
+                createdAt -> assertThat(createdAt).isNotNull());
+    }
+
+    @Test
+    void loadContentReturnsBytesAndImageContentTypeForAScreenshot() throws Exception {
+        byte[] content = "screenshot-bytes".getBytes(StandardCharsets.UTF_8);
+        UUID evidenceId = evidenceService.store(testResultId, "SCREENSHOT", "device.png",
+                content.length, sha256Hex(content), new ByteArrayInputStream(content));
+
+        EvidenceService.EvidenceContent loaded = evidenceService.loadContent(evidenceId);
+
+        assertThat(loaded.bytes()).isEqualTo(content);
+        assertThat(loaded.contentType()).isEqualTo("image/png");
+    }
+
+    @Test
+    void loadContentReturnsTextContentTypeForALog() throws Exception {
+        byte[] content = "log line one\nlog line two".getBytes(StandardCharsets.UTF_8);
+        UUID evidenceId = evidenceService.store(testResultId, "LOG", "device.log",
+                content.length, sha256Hex(content), new ByteArrayInputStream(content));
+
+        EvidenceService.EvidenceContent loaded = evidenceService.loadContent(evidenceId);
+
+        assertThat(loaded.bytes()).isEqualTo(content);
+        assertThat(loaded.contentType()).isEqualTo("text/plain");
+    }
+
+    @Test
+    void loadContentThrowsWhenTheEvidenceRowDoesNotExist() {
+        assertThatThrownBy(() -> evidenceService.loadContent(UUID.randomUUID()))
+                .isInstanceOf(EvidenceNotFoundException.class);
     }
 }

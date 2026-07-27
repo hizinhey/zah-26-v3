@@ -2,6 +2,7 @@ import type {
   ApiError,
   ApprovePlanRequest,
   CreateOperationRequest,
+  EvidenceItem,
   ExecutionResponse,
   ExecutionStatus,
   GeneratePlanRequest,
@@ -113,5 +114,9 @@ export const apiClient = {
 
   getExecution(executionId: string): Promise<ExecutionStatus> {
     return request<ExecutionStatus>(`/executions/${executionId}`);
+  },
+
+  listEvidence(testResultId: string): Promise<EvidenceItem[]> {
+    return request<EvidenceItem[]>(`/test-results/${testResultId}/evidence`);
   },
 };

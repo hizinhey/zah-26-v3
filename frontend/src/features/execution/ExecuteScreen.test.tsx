@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   startExecution: vi.fn(),
   getPlan: vi.fn(),
   getExecution: vi.fn(),
+  listEvidence: vi.fn(),
 }));
 
 vi.mock("../../api/client", async () => {
@@ -261,7 +262,7 @@ describe("ExecuteScreen", () => {
     expect(await screen.findByText(/Execution complete: 4 passed, 1 failed out of 5\./)).toBeInTheDocument();
   });
 
-  it("shows a disabled evidence control with an explanatory tooltip for a failed test case (no browser-facing evidence viewer exists yet)", async () => {
+  it("shows no evidence control for a failed test case until its result has been fetched", async () => {
     renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
     const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;
 
@@ -273,9 +274,64 @@ describe("ExecuteScreen", () => {
       payload: { executionId: "exec-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
     });
 
+    await waitFor(() => expect(screen.getByText("Failed")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "View Evidence" })).not.toBeInTheDocument();
+  });
+
+  it("enables View Evidence once the failed test case's result is fetched, and opens the evidence modal", async () => {
+    const { queryClient } = renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
+    const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;
+    await waitFor(() => expect(mocks.getExecution).toHaveBeenCalled());
+
+    dispatchEnvelope({
+      messageId: "m1",
+      version: 1,
+      type: "TEST_RESULT",
+      timestamp: "2026-07-27T00:00:01Z",
+      payload: { executionId: "exec-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
+    });
+    mocks.getExecution.mockResolvedValue({
+      ...execution(),
+      results: [
+        { id: "result-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
+      ],
+    });
+    await queryClient.refetchQueries({ queryKey: executionQueryKey("op-1") });
+    mocks.listEvidence.mockResolvedValue([]);
+
     const evidenceButton = await screen.findByRole("button", { name: "View Evidence" });
-    expect(evidenceButton).toBeDisabled();
-    expect(evidenceButton).toHaveAttribute("title", expect.stringContaining("isn't available yet"));
+    expect(evidenceButton).toBeEnabled();
+    await userEvent.click(evidenceButton);
+
+    expect(await screen.findByRole("dialog", { name: "Evidence" })).toBeInTheDocument();
+    expect(mocks.listEvidence).toHaveBeenCalledWith("result-1");
+  });
+
+  it("closes the evidence modal on Escape", async () => {
+    const { queryClient } = renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
+    const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;
+    await waitFor(() => expect(mocks.getExecution).toHaveBeenCalled());
+    dispatchEnvelope({
+      messageId: "m1",
+      version: 1,
+      type: "TEST_RESULT",
+      timestamp: "2026-07-27T00:00:01Z",
+      payload: { executionId: "exec-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
+    });
+    mocks.getExecution.mockResolvedValue({
+      ...execution(),
+      results: [
+        { id: "result-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
+      ],
+    });
+    await queryClient.refetchQueries({ queryKey: executionQueryKey("op-1") });
+    mocks.listEvidence.mockResolvedValue([]);
+    await userEvent.click(await screen.findByRole("button", { name: "View Evidence" }));
+    await screen.findByRole("dialog", { name: "Evidence" });
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).not.toBeInTheDocument());
   });
 
   it("switches to the Logs tab and shows accumulated log entries", async () => {
