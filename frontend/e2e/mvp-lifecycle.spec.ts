@@ -193,7 +193,7 @@ test("drives the full input-through-execute lifecycle and proves the REST-poll f
   await page.getByLabel(/Thumb URL/).fill("https://example.com/thumb.png");
   await page.getByLabel(/Content/).fill("Header line\nBody line");
   await page.getByLabel(/Button Text/).fill("Try now");
-  await page.getByLabel(/URL Direction/).fill("https://example.com/redirect");
+  await page.getByLabel(/URL Redirect/).fill("https://example.com/redirect");
 
   const submit = page.getByRole("button", { name: /AI Validation/ });
   await expect(submit).toBeEnabled();

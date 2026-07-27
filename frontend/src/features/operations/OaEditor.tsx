@@ -1,20 +1,21 @@
-import type { ReactElement } from "react";
+import type { ComponentType, ReactElement, SVGProps } from "react";
 import type { OfficialAccountInput, Platform } from "../../api/generated";
+import { AndroidIcon, IosIcon, PcIcon, WebIcon } from "../../components/icons";
 import { ContentPreview } from "./ContentPreview";
 import styles from "./OaEditor.module.css";
 
-const CONTENT_MAX_LENGTH = 500;
+const CONTENT_MAX_LENGTH = 3000;
 
 export type EditableOaField = "platform" | "thumbnailUrl" | "content" | "buttonText" | "redirectUrl";
 
 // Only ANDROID is generated/validated/executed end-to-end today (backend rejects any other
 // platform when saving OAs). The other three are offered here to match the mockup's platform
 // selector; picking one will surface a normal validation/save error until they're implemented.
-const PLATFORMS: { value: Platform; label: string }[] = [
-  { value: "ANDROID", label: "Android" },
-  { value: "IOS", label: "iOS" },
-  { value: "PC", label: "PC" },
-  { value: "WEB", label: "Web" },
+const PLATFORMS: { value: Platform; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { value: "ANDROID", label: "Android", Icon: AndroidIcon },
+  { value: "IOS", label: "iOS", Icon: IosIcon },
+  { value: "PC", label: "PC", Icon: PcIcon },
+  { value: "WEB", label: "Web", Icon: WebIcon },
 ];
 
 export interface OaEditorProps {
@@ -29,7 +30,10 @@ function FieldLabel({ number, text }: { number: number; text: string }): ReactEl
         {number}
       </span>
       {text}
-      <span aria-hidden="true"> *</span>
+      <span className={styles.requiredMark} aria-hidden="true">
+        {" "}
+        *
+      </span>
     </span>
   );
 }
@@ -51,6 +55,7 @@ export function OaEditor({ oa, onFieldChange }: OaEditorProps): ReactElement {
               data-selected={oa.platform === platform.value || undefined}
               onClick={() => onFieldChange("platform", platform.value)}
             >
+              <platform.Icon />
               {platform.label}
             </button>
           ))}
@@ -104,7 +109,7 @@ export function OaEditor({ oa, onFieldChange }: OaEditorProps): ReactElement {
 
       <div className={styles.field}>
         <label className={styles.fieldLabelWrapper} htmlFor="oa-redirect-url">
-          <FieldLabel number={5} text="URL Direction" />
+          <FieldLabel number={5} text="URL Redirect" />
         </label>
         <input
           id="oa-redirect-url"

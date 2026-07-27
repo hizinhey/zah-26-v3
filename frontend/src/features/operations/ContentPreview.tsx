@@ -56,7 +56,7 @@ export function ContentPreview({ content }: ContentPreviewProps): ReactElement {
     <div className={styles.preview}>
       <div className={styles.row}>
         <span className={styles.label}>Header preview</span>
-        <span className={styles.value} data-testid="content-header-preview">
+        <span className={`${styles.value} ${styles.headerValue}`} data-testid="content-header-preview">
           {header}
         </span>
       </div>

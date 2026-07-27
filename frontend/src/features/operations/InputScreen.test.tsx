@@ -123,7 +123,7 @@ describe("InputScreen", () => {
     await user.type(screen.getByLabelText(/Thumb URL/), "https://example.com/thumb.png");
     await user.type(screen.getByLabelText(/Content/), "Header line\nBody line");
     await user.type(screen.getByLabelText(/Button Text/), "Try now");
-    await user.type(screen.getByLabelText(/URL Direction/), "https://example.com/redirect");
+    await user.type(screen.getByLabelText(/URL Redirect/), "https://example.com/redirect");
 
     expect(submit).toBeEnabled();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
@@ -163,7 +163,7 @@ describe("InputScreen", () => {
     await user.type(screen.getByLabelText(/Thumb URL/), "https://example.com/thumb.png");
     await user.type(screen.getByLabelText(/Content/), "Header\nBody");
     await user.type(screen.getByLabelText(/Button Text/), "Try now");
-    await user.type(screen.getByLabelText(/URL Direction/), "https://example.com/redirect");
+    await user.type(screen.getByLabelText(/URL Redirect/), "https://example.com/redirect");
 
     await user.click(screen.getByRole("button", { name: /AI Validation/ }));
 
@@ -194,7 +194,7 @@ describe("InputScreen", () => {
     await user.type(screen.getByLabelText(/Thumb URL/), "https://example.com/thumb.png");
     await user.type(screen.getByLabelText(/Content/), "Header\nBody");
     await user.type(screen.getByLabelText(/Button Text/), "Try now");
-    await user.type(screen.getByLabelText(/URL Direction/), "https://example.com/redirect");
+    await user.type(screen.getByLabelText(/URL Redirect/), "https://example.com/redirect");
 
     await user.click(screen.getByRole("button", { name: /AI Validation/ }));
 

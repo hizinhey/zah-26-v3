@@ -79,7 +79,7 @@ test("fills OA details, runs AI validation, and reaches an enabled Generate acti
   await page.getByLabel(/Thumb URL/).fill("https://example.com/thumb.png");
   await page.getByLabel(/Content/).fill("Header line\nBody line");
   await page.getByLabel(/Button Text/).fill("Try now");
-  await page.getByLabel(/URL Direction/).fill("https://example.com/redirect");
+  await page.getByLabel(/URL Redirect/).fill("https://example.com/redirect");
 
   await expect(page.getByTestId("oa-platform")).toHaveText("Android");
 

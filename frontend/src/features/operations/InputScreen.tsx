@@ -7,6 +7,7 @@ import { DisabledReason } from "../../components/DisabledReason";
 import { OPERATION_STEPS } from "../../app/router";
 import type { OfficialAccountInput } from "../../api/generated";
 import { OaEditor, type EditableOaField } from "./OaEditor";
+import { SparkleIcon } from "../../components/icons";
 import {
   NEW_OPERATION_ID,
   isRevisionConflict,
@@ -209,7 +210,10 @@ export function InputScreen(): ReactElement {
         <Card title="Jira & OA Input">
           <div className={styles.field}>
             <label className={styles.label} htmlFor="jira-id">
-              Jira ID <span aria-hidden="true">*</span>
+              Jira ID{" "}
+              <span className={styles.requiredMark} aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="jira-id"
@@ -220,54 +224,56 @@ export function InputScreen(): ReactElement {
             />
           </div>
 
-          <div className={styles.tabs} role="tablist" aria-label="Official accounts">
-            {oas.map((oa, index) => (
-              <div key={index} className={styles.tabGroup}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={index === activeIndex}
-                  className={`${styles.tab} ${index === activeIndex ? styles.tabActive : ""}`}
-                  onClick={() => setActiveIndex(index)}
-                >
-                  OA #{index + 1}
-                </button>
-                {index === activeIndex ? (
-                  <span className={styles.tabActions}>
-                    <button
-                      type="button"
-                      aria-label={`Move OA #${index + 1} earlier`}
-                      className={styles.tabActionButton}
-                      disabled={index === 0}
-                      onClick={() => moveOa(index, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move OA #${index + 1} later`}
-                      className={styles.tabActionButton}
-                      disabled={index === oas.length - 1}
-                      onClick={() => moveOa(index, 1)}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Remove OA #${index + 1}`}
-                      className={styles.tabActionButton}
-                      disabled={oas.length <= 1}
-                      onClick={() => removeOa(index)}
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ) : null}
-              </div>
-            ))}
-            <button type="button" className={styles.addOa} onClick={addOa}>
-              + Add OA
-            </button>
+          <div className={styles.tabsWrapper}>
+            <div className={styles.tabs} role="tablist" aria-label="Official accounts">
+              {oas.map((oa, index) => (
+                <div key={index} className={styles.tabGroup}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={index === activeIndex}
+                    className={`${styles.tab} ${index === activeIndex ? styles.tabActive : ""}`}
+                    onClick={() => setActiveIndex(index)}
+                  >
+                    OA #{index + 1}
+                  </button>
+                  {index === activeIndex ? (
+                    <span className={styles.tabActions}>
+                      <button
+                        type="button"
+                        aria-label={`Move OA #${index + 1} earlier`}
+                        className={styles.tabActionButton}
+                        disabled={index === 0}
+                        onClick={() => moveOa(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move OA #${index + 1} later`}
+                        className={styles.tabActionButton}
+                        disabled={index === oas.length - 1}
+                        onClick={() => moveOa(index, 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove OA #${index + 1}`}
+                        className={styles.tabActionButton}
+                        disabled={oas.length <= 1}
+                        onClick={() => removeOa(index)}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+              <button type="button" className={styles.addOa} onClick={addOa}>
+                + Add OA
+              </button>
+            </div>
           </div>
 
           {activeOa ? (
@@ -290,33 +296,38 @@ export function InputScreen(): ReactElement {
           </p>
         </Card>
 
-        <Card title="OA Overview" className={styles.overview}>
-          <div className={styles.overviewRow}>
-            <span>Tổng số OA</span>
-            <strong>{oas.length}</strong>
-          </div>
-          <div className={styles.overviewRow}>
-            <span>Đã nhập đầy đủ</span>
-            <strong>{oas.filter(isOaComplete).length}</strong>
-          </div>
-          <div className={styles.overviewRow}>
-            <span>Chưa hoàn tất</span>
-            <strong>{oas.filter((oa) => !isOaComplete(oa)).length}</strong>
-          </div>
-        </Card>
-      </div>
+        <div className={styles.overviewColumn}>
+          <Card title="OA Overview" className={styles.overview}>
+            <div className={styles.overviewRow}>
+              <span>Tổng số OA</span>
+              <strong className={styles.overviewValue}>{oas.length}</strong>
+            </div>
+            <div className={styles.overviewRow}>
+              <span>Đã nhập đầy đủ</span>
+              <strong className={styles.overviewValue}>{oas.filter(isOaComplete).length}</strong>
+            </div>
+            <div className={styles.overviewRow}>
+              <span>Chưa hoàn tất</span>
+              <strong className={styles.overviewValue}>
+                {oas.filter((oa) => !isOaComplete(oa)).length}
+              </strong>
+            </div>
+          </Card>
 
-      <div className={styles.actions}>
-        <DisabledReason reason={submitDisabledReason}>
-          <button
-            type="button"
-            className="ops-primary-button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Validating…" : "AI Validation"}
-          </button>
-        </DisabledReason>
+          <div className={styles.actions}>
+            <DisabledReason reason={submitDisabledReason}>
+              <button
+                type="button"
+                className="ops-primary-button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+              >
+                <SparkleIcon />
+                {isSubmitting ? "Validating…" : "AI Validation"}
+              </button>
+            </DisabledReason>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -93,3 +93,4 @@ deploy/env/*.env
 !deploy/env/*.env.example
 deploy/.env
 trash/
+.scratch/

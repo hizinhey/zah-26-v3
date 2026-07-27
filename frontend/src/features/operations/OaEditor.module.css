@@ -24,6 +24,10 @@
   color: var(--ops-color-gray-900);
 }
 
+.requiredMark {
+  color: var(--ops-color-red-500);
+}
+
 .fieldNumber {
   display: inline-flex;
   align-items: center;
