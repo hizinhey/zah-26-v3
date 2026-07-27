@@ -193,6 +193,15 @@ export interface ExecutionTestResult {
   errorCategory: ErrorCategory | null;
 }
 
+/** One evidence file's metadata, as returned by GET /test-results/{testResultId}/evidence. */
+export interface EvidenceItem {
+  id: Uuid;
+  evidenceType: string;
+  sizeBytes: number;
+  checksum: string;
+  createdAt: string;
+}
+
 /** GET /executions/{executionId} response: current status plus every recorded test result. */
 export interface ExecutionStatus {
   id: Uuid;
