@@ -3,6 +3,7 @@ package com.opshub.hub.application;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -32,17 +33,18 @@ public class HubConnectionService {
     }
 
     private void upsert(UUID hubId, String transport, String status, Boolean deviceReady, Boolean runnerReady) {
+        Timestamp heartbeatAt = Timestamp.from(Instant.now());
         int updated = jdbcTemplate.update("""
                         UPDATE hubs
                         SET connection_status = ?, transport = ?, last_heartbeat_at = ?,
                             device_ready = COALESCE(?, device_ready), runner_ready = COALESCE(?, runner_ready)
                         WHERE id = ?
-                        """, status, transport, Instant.now(), deviceReady, runnerReady, hubId);
+                        """, status, transport, heartbeatAt, deviceReady, runnerReady, hubId);
         if (updated == 0) {
             jdbcTemplate.update("""
                             INSERT INTO hubs (id, name, connection_status, transport, last_heartbeat_at, device_ready, runner_ready)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """, hubId, hubId.toString(), status, transport, Instant.now(),
+                            """, hubId, hubId.toString(), status, transport, heartbeatAt,
                     deviceReady != null && deviceReady, runnerReady != null && runnerReady);
         }
     }

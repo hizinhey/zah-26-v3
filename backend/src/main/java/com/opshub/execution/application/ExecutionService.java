@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -94,7 +95,8 @@ public class ExecutionService {
         jdbcTemplate.update("""
                         INSERT INTO executions (id, operation_id, plan_id, source_revision, idempotency_key, status, queued_at)
                         VALUES (?, ?, ?, ?, ?, 'QUEUED', ?)
-                        """, executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey, now);
+                        """, executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey,
+                Timestamp.from(now));
         return new ExecutionDto(executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey, "QUEUED", now);
     }
 
@@ -163,7 +165,7 @@ public class ExecutionService {
                             UPDATE executions
                             SET status = 'RUNNING', hub_id = ?, started_at = COALESCE(started_at, ?)
                             WHERE id = ?
-                            """, hubId, Instant.now(), executionId);
+                            """, hubId, Timestamp.from(Instant.now()), executionId);
             return Optional.of(buildJobOfferedEnvelope(executionId, leaseToken));
         } finally {
             lock.unlock();
@@ -249,7 +251,7 @@ public class ExecutionService {
         if (pending != null && pending == 0) {
             jdbcTemplate.update("""
                             UPDATE executions SET status = 'COMPLETED', finished_at = ? WHERE id = ?
-                            """, Instant.now(), executionId);
+                            """, Timestamp.from(Instant.now()), executionId);
             leaseService.release(executionId);
             // Bound the lifetime of the monotonic-delivery tracker to the execution: once every
             // test case has reached a terminal outcome there is nothing left to reorder-check, and
@@ -305,12 +307,13 @@ public class ExecutionService {
                               SELECT 1 FROM job_leases lease
                               WHERE lease.execution_id = execution.id AND lease.expires_at > ?
                           )
-                        """, (rs, rowNum) -> (UUID) rs.getObject("id"), cutoff, Instant.now());
+                        """, (rs, rowNum) -> (UUID) rs.getObject("id"), Timestamp.from(cutoff),
+                Timestamp.from(Instant.now()));
 
         for (UUID executionId : abandoned) {
             jdbcTemplate.update("""
                             UPDATE executions SET status = 'FAILED', finished_at = ? WHERE id = ?
-                            """, Instant.now(), executionId);
+                            """, Timestamp.from(Instant.now()), executionId);
             leaseService.release(executionId);
             lastMessageTimestamps.remove(executionId);
         }

@@ -3,6 +3,7 @@ package com.opshub.execution.application;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -26,7 +27,7 @@ public class LeaseService {
     public boolean hasActiveLease(UUID hubId) {
         Integer count = jdbcTemplate.queryForObject("""
                         SELECT COUNT(*) FROM job_leases WHERE hub_id = ? AND expires_at > ?
-                        """, Integer.class, hubId, Instant.now());
+                        """, Integer.class, hubId, now());
         return count != null && count > 0;
     }
 
@@ -40,12 +41,12 @@ public class LeaseService {
      * callers should treat the same as "nothing to offer right now".
      */
     public UUID acquire(UUID hubId, UUID executionId) {
-        jdbcTemplate.update("DELETE FROM job_leases WHERE hub_id = ? AND expires_at <= ?", hubId, Instant.now());
+        jdbcTemplate.update("DELETE FROM job_leases WHERE hub_id = ? AND expires_at <= ?", hubId, now());
         UUID leaseToken = UUID.randomUUID();
         jdbcTemplate.update("""
                         INSERT INTO job_leases (id, hub_id, execution_id, lease_token, expires_at)
                         VALUES (?, ?, ?, ?, ?)
-                        """, UUID.randomUUID(), hubId, executionId, leaseToken, Instant.now().plus(LEASE_DURATION));
+                        """, UUID.randomUUID(), hubId, executionId, leaseToken, expiresAt());
         return leaseToken;
     }
 
@@ -58,7 +59,7 @@ public class LeaseService {
                         UPDATE job_leases
                         SET expires_at = ?
                         WHERE lease_token = ? AND hub_id = ? AND expires_at > ?
-                        """, Instant.now().plus(LEASE_DURATION), leaseToken, hubId, Instant.now());
+                        """, expiresAt(), leaseToken, hubId, now());
         return updated == 1;
     }
 
@@ -71,7 +72,7 @@ public class LeaseService {
                         UPDATE job_leases
                         SET expires_at = ?
                         WHERE hub_id = ? AND expires_at > ?
-                        """, Instant.now().plus(LEASE_DURATION), hubId, Instant.now());
+                        """, expiresAt(), hubId, now());
         return updated == 1;
     }
 
@@ -95,7 +96,15 @@ public class LeaseService {
                           )
                         ORDER BY execution.queued_at ASC
                         LIMIT 1
-                        """, UUID.class, Instant.now())
+                        """, UUID.class, now())
                 .stream().findFirst();
+    }
+
+    private static Timestamp now() {
+        return Timestamp.from(Instant.now());
+    }
+
+    private static Timestamp expiresAt() {
+        return Timestamp.from(Instant.now().plus(LEASE_DURATION));
     }
 }
