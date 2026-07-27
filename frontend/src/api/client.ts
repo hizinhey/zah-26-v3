@@ -1,8 +1,13 @@
 import type {
   ApiError,
+  ApprovePlanRequest,
   CreateOperationRequest,
+  ExecutionResponse,
+  GeneratePlanRequest,
   Operation,
   ReplaceOasRequest,
+  StartExecutionRequest,
+  TestPlan,
   ValidateOperationRequest,
   ValidationRun,
 } from "./generated";
@@ -75,6 +80,27 @@ export const apiClient = {
     payload: ValidateOperationRequest,
   ): Promise<ValidationRun> {
     return request<ValidationRun>(`/operations/${operationId}/validate`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  generatePlan(operationId: string, payload: GeneratePlanRequest): Promise<TestPlan> {
+    return request<TestPlan>(`/operations/${operationId}/plans`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  approvePlan(planId: string, payload: ApprovePlanRequest): Promise<void> {
+    return request<void>(`/plans/${planId}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  startExecution(operationId: string, payload: StartExecutionRequest): Promise<ExecutionResponse> {
+    return request<ExecutionResponse>(`/operations/${operationId}/executions`, {
       method: "POST",
       body: JSON.stringify(payload),
     });

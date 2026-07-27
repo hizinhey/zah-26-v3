@@ -1,7 +1,9 @@
 import type { ReactElement } from "react";
-import { Navigate, Outlet, createBrowserRouter, useParams } from "react-router-dom";
+import { Navigate, Outlet, createBrowserRouter } from "react-router-dom";
 import { InputScreen } from "../features/operations/InputScreen";
 import { VerifyScreen } from "../features/validation/VerifyScreen";
+import { GenerateScreen } from "../features/generation/GenerateScreen";
+import { ExecuteScreen } from "../features/execution/ExecuteScreen";
 
 export type OperationStepId = "input" | "verify" | "generate" | "execute";
 
@@ -27,17 +29,6 @@ function OperationLayout(): ReactElement {
   return <Outlet />;
 }
 
-// Placeholder screens; Tasks 10-11 replace these with real step content.
-function StepPlaceholder({ label }: { label: string }): ReactElement {
-  const { operationId } = useParams();
-  return (
-    <div>
-      <h1 className="ops-page-title">{label}</h1>
-      <p>Operation: {operationId}</p>
-    </div>
-  );
-}
-
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -50,8 +41,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="input" replace /> },
       { path: "input", element: <InputScreen /> },
       { path: "verify", element: <VerifyScreen /> },
-      { path: "generate", element: <StepPlaceholder label="Generate Test Cases" /> },
-      { path: "execute", element: <StepPlaceholder label="Confirm & Start Execution" /> },
+      { path: "generate", element: <GenerateScreen /> },
+      { path: "execute", element: <ExecuteScreen /> },
     ],
   },
 ]);
