@@ -24,6 +24,25 @@ class EvidenceType(str, Enum):
     LOG = "LOG"
 
 
+def deterministic_test_result_id(execution_id: UUID, test_case_id: UUID, attempt: int) -> UUID:
+    """Computes the same `test_results.id` the backend generates for this
+    (executionId, testCaseId, attempt) triple, so evidence can be uploaded against
+    it without a round trip to learn a server-generated id (see
+    `ExecutionService.testResultId` in the backend, which the two MUST match
+    byte-for-byte).
+
+    This reimplements `java.util.UUID.nameUUIDFromBytes` from scratch: MD5 the
+    UTF-8 bytes of the canonical string, then set the version (3) and variant
+    (RFC 4122) bits on the digest. Note `uuid.uuid3` from the stdlib does NOT
+    match, because it prepends namespace bytes before hashing.
+    """
+    canonical = f"{execution_id}:{test_case_id}:{attempt}"
+    digest = bytearray(hashlib.md5(canonical.encode("utf-8")).digest())
+    digest[6] = (digest[6] & 0x0F) | 0x30
+    digest[8] = (digest[8] & 0x3F) | 0x80
+    return UUID(bytes=bytes(digest))
+
+
 def sha256_of(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:

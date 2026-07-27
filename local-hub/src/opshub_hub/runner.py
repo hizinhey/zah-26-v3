@@ -18,7 +18,13 @@ from typing import Callable, Protocol
 from uuid import UUID, uuid4
 
 from opshub_hub.classification import FailureCategory, classify_failure
-from opshub_hub.evidence import EvidenceFile, EvidenceType, EvidenceUploadError, EvidenceUploader
+from opshub_hub.evidence import (
+    EvidenceFile,
+    EvidenceType,
+    EvidenceUploadError,
+    EvidenceUploader,
+    deterministic_test_result_id,
+)
 from opshub_hub.models import (
     ErrorCategory,
     JobOfferedPayload,
@@ -145,7 +151,7 @@ class Runner:
             self._send_result(result_payload)
             summary.results.append(result_payload)
 
-            self._capture_and_upload_evidence(test_case, record, evidence_dir)
+            self._capture_and_upload_evidence(job.executionId, test_case, record, evidence_dir)
 
             self._send_progress(
                 job.executionId,
@@ -223,7 +229,9 @@ class Runner:
             # (e.g. after failover or reconnect) rather than being dropped.
             pass
 
-    def _capture_and_upload_evidence(self, test_case: TestCase, record: AttemptRecord, evidence_dir: Path) -> None:
+    def _capture_and_upload_evidence(
+        self, execution_id: UUID, test_case: TestCase, record: AttemptRecord, evidence_dir: Path
+    ) -> None:
         """Capture the final screen on pass, or the failure screen on fail/error,
         and upload it separately from the TEST_RESULT envelope. The local file is
         left on disk if the upload fails or no uploader is configured, so it can
@@ -238,8 +246,9 @@ class Runner:
         if self._evidence_uploader is None:
             return
         evidence = EvidenceFile(path=screenshot_path, evidence_type=EvidenceType.SCREENSHOT)
+        test_result_id = deterministic_test_result_id(execution_id, test_case.testCaseId, record.attempt)
         try:
-            self._evidence_uploader.upload(test_case.testCaseId, evidence)
+            self._evidence_uploader.upload(test_result_id, evidence)
         except EvidenceUploadError:
             # Local file is preserved on disk until a future acknowledged upload.
             return

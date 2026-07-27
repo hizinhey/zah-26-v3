@@ -11,6 +11,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -177,10 +178,26 @@ public class ExecutionService {
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (execution_id, test_case_id, attempt)
                         DO UPDATE SET status = EXCLUDED.status, duration_ms = EXCLUDED.duration_ms, error_category = EXCLUDED.error_category
-                        """, UUID.randomUUID(), payload.executionId(), payload.testCaseId(), payload.attempt(),
+                        """, testResultId(payload.executionId(), payload.testCaseId(), payload.attempt()),
+                payload.executionId(), payload.testCaseId(), payload.attempt(),
                 payload.status(), payload.durationMs(), payload.errorCategory());
 
         completeIfEveryTestCaseReachedATerminalOutcome(payload.executionId());
+    }
+
+    /**
+     * Deterministic {@code test_results.id} computed from {@code (executionId, testCaseId,
+     * attempt)} rather than randomly generated, so the Hub can compute the same id locally
+     * (see {@code opshub_hub.evidence.deterministic_test_result_id}) and upload evidence for
+     * it without waiting for an acknowledgement carrying a server-generated id. Uses
+     * {@link UUID#nameUUIDFromBytes(byte[])}, which implements MD5-based name-based UUID
+     * generation (version 3) - identical, byte-for-byte, to the algorithm reimplemented on
+     * the Hub side in Python (MD5 the UTF-8 bytes of the canonical string, then set the
+     * version/variant bits).
+     */
+    private static UUID testResultId(UUID executionId, UUID testCaseId, int attempt) {
+        String canonical = executionId + ":" + testCaseId + ":" + attempt;
+        return UUID.nameUUIDFromBytes(canonical.getBytes(StandardCharsets.UTF_8));
     }
 
     private void completeIfEveryTestCaseReachedATerminalOutcome(UUID executionId) {

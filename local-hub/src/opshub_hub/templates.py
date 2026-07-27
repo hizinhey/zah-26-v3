@@ -15,20 +15,13 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from opshub_hub.models import TemplateParametersV1
+
 _PLACEHOLDER = re.compile(r"\{\{\{json ([a-zA-Z][a-zA-Z0-9]*)\}\}\}")
 
-# Mirrors opshub_hub.models.TemplateParametersV1 fields exactly.
-ALLOWED_PARAMETER_NAMES: frozenset[str] = frozenset(
-    {
-        "oaName",
-        "thumbnailUrl",
-        "expectedHeader",
-        "expectedBody",
-        "expectedButtonText",
-        "expectedRedirectUrl",
-        "expectedRedirectDomain",
-    }
-)
+# Derived from opshub_hub.models.TemplateParametersV1's declared fields rather than
+# hand-copied, so a future field rename in models.py can't silently drift out of sync.
+ALLOWED_PARAMETER_NAMES: frozenset[str] = frozenset(TemplateParametersV1.model_fields.keys())
 
 
 class TemplateIntegrityError(Exception):

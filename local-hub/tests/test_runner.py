@@ -1,9 +1,9 @@
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from opshub_hub.evidence import EvidenceFile, EvidenceUploadError
+from opshub_hub.evidence import EvidenceFile, EvidenceUploadError, deterministic_test_result_id
 from opshub_hub.models import (
     ErrorCategory,
     JobOfferedPayload,
@@ -240,10 +240,16 @@ def test_final_evidence_is_captured_and_uploaded(tmp_path):
     # One screenshot captured per test case (the final screen for each).
     assert len(capturer.calls) == 5
     assert len(uploader.uploads) == 5
-    for _test_result_id, evidence in uploader.uploads:
+    for test_result_id, evidence in uploader.uploads:
         assert evidence.path.is_file()
         assert evidence.sha256  # computed successfully
         assert evidence.size > 0
+        # The uploaded id must be the deterministic id the backend independently
+        # computes for (executionId, testCaseId, attempt) - not testCaseId itself -
+        # or the real backend rejects the upload (test_results row doesn't exist yet).
+        test_case_id = UUID(evidence.path.stem.rsplit("-attempt", 1)[0])
+        attempt = int(evidence.path.stem.rsplit("-attempt", 1)[1])
+        assert test_result_id == deterministic_test_result_id(job.executionId, test_case_id, attempt)
 
 
 def test_evidence_upload_failure_preserves_local_file(tmp_path):
