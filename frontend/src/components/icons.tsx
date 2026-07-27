@@ -65,8 +65,24 @@ export function WebIcon(props: IconProps): ReactElement {
 
 export function SparkleIcon(props: IconProps): ReactElement {
   return (
-    <svg {...baseProps({ fill: "currentColor", stroke: "none", ...props })}>
-      <path d="M8 1.5c0.3 2.3 1 3.9 2 4.9 1 1 2.6 1.7 4.9 2-2.3 0.3-3.9 1-4.9 2-1 1-1.7 2.6-2 4.9-0.3-2.3-1-3.9-2-4.9-1-1-2.6-1.7-4.9-2 2.3-0.3 3.9-1 4.9-2 1-1 1.7-2.6 2-4.9z" />
+    <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden {...props}>
+      <defs>
+        <linearGradient id="ops-sparkle-gradient" x1="0" y1="0" x2="16" y2="16">
+          <stop offset="0%" stopColor="#8AB4FF" />
+          <stop offset="50%" stopColor="#E2A6FF" />
+          <stop offset="100%" stopColor="#FFB199" />
+        </linearGradient>
+      </defs>
+      <path
+        fill="#ffffff"
+        opacity="0.55"
+        transform="translate(8 8) scale(1.35) translate(-8 -8)"
+        d="M8 0c0 4.05 3.95 8 8 8-4.05 0-8 3.95-8 8 0-4.05-3.95-8-8-8 4.05 0 8-3.95 8-8z"
+      />
+      <path
+        fill="url(#ops-sparkle-gradient)"
+        d="M8 0c0 4.05 3.95 8 8 8-4.05 0-8 3.95-8 8 0-4.05-3.95-8-8-8 4.05 0 8-3.95 8-8z"
+      />
     </svg>
   );
 }
