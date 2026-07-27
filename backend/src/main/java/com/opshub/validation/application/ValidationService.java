@@ -21,7 +21,7 @@ import java.util.UUID;
 @Service
 public class ValidationService {
     private static final String GENERATE_DISABLED_REASON =
-            "Resolve every failed, warning, or unavailable validation finding before generating tests.";
+            "Resolve every failed or unavailable validation finding before generating tests.";
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -54,7 +54,10 @@ public class ValidationService {
         }
 
         List<FieldFinding> findings = collectFindings(operation);
-        boolean canGenerate = findings.stream().allMatch(finding -> finding.status() == FieldStatus.PASSED);
+        // WARNING findings don't block generation; only FAILED/UNABLE_TO_CHECK/INVALID do.
+        boolean canGenerate = findings.stream().noneMatch(finding -> finding.status() == FieldStatus.FAILED
+                || finding.status() == FieldStatus.UNABLE_TO_CHECK
+                || finding.status() == FieldStatus.INVALID);
         OperationStatus status = canGenerate ? OperationStatus.VALIDATED : OperationStatus.VALIDATION_FAILED;
         UUID validationRunId = UUID.randomUUID();
 

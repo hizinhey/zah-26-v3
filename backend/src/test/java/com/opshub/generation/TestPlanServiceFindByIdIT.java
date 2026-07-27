@@ -67,10 +67,10 @@ class TestPlanServiceFindByIdIT {
         assertThat(plan.operationId()).isEqualTo(operationId);
         assertThat(plan.status()).isEqualTo("READY");
         assertThat(plan.approvalStatus()).isEqualTo("PENDING");
-        assertThat(plan.cases()).hasSize(2);
-        assertThat(plan.cases().get(0).testCaseId()).isEqualTo(firstCase);
-        assertThat(plan.cases().get(1).testCaseId()).isEqualTo(secondCase);
-        assertThat(plan.cases().get(0).parameters().oaName()).isEqualTo("Test OA");
+        assertThat(plan.testCases()).hasSize(2);
+        assertThat(plan.testCases().get(0).testCaseId()).isEqualTo(firstCase);
+        assertThat(plan.testCases().get(1).testCaseId()).isEqualTo(secondCase);
+        assertThat(plan.testCases().get(0).parameters().oaName()).isEqualTo("Test OA");
     }
 
     @Test

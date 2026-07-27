@@ -190,22 +190,22 @@ public class TestPlanService {
                         SELECT COUNT(*) FROM validation_runs
                         WHERE operation_id = ? AND source_revision = ? AND status = 'VALIDATED'
                         """, Integer.class, operationId, revision);
-        Integer nonPassedFindings = jdbcTemplate.queryForObject("""
+        Integer blockingFindings = jdbcTemplate.queryForObject("""
                         SELECT COUNT(*)
                         FROM field_findings finding
                         JOIN validation_runs validation_run ON validation_run.id = finding.validation_run_id
                         WHERE validation_run.operation_id = ?
                           AND validation_run.source_revision = ?
                           AND validation_run.status = 'VALIDATED'
-                          AND finding.status <> 'PASSED'
+                          AND finding.status NOT IN ('PASSED', 'WARNING')
                         """, Integer.class, operationId, revision);
-        if (!isGenerationAllowed(passingRuns, nonPassedFindings)) {
-            throw new IllegalStateException("Every validation finding must be PASSED before generating tests");
+        if (!isGenerationAllowed(passingRuns, blockingFindings)) {
+            throw new IllegalStateException("Every validation finding must be PASSED or WARNING before generating tests");
         }
     }
 
-    public static boolean isGenerationAllowed(Integer passingRuns, Integer nonPassedFindings) {
-        return passingRuns != null && passingRuns == 1 && nonPassedFindings != null && nonPassedFindings == 0;
+    public static boolean isGenerationAllowed(Integer passingRuns, Integer blockingFindings) {
+        return passingRuns != null && passingRuns == 1 && blockingFindings != null && blockingFindings == 0;
     }
 
     private Operation findRequired(UUID operationId) {
@@ -280,7 +280,7 @@ public class TestPlanService {
             String templateSha256,
             TemplateParameters parameters,
             String status,
-            String readinessReason
+            String reason
     ) {
     }
 
@@ -291,7 +291,7 @@ public class TestPlanService {
             String templateCatalogVersion,
             String status,
             String approvalStatus,
-            List<TestCaseDto> cases
+            List<TestCaseDto> testCases
     ) {
     }
 }

@@ -93,7 +93,25 @@ class ValidationGatingIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.canGenerate").value(false))
-                .andExpect(jsonPath("$.generateDisabledReasons[0]").value("Resolve every failed, warning, or unavailable validation finding before generating tests."));
+                .andExpect(jsonPath("$.generateDisabledReasons[0]").value("Resolve every failed or unavailable validation finding before generating tests."));
+    }
+
+    @Test
+    void allowsGenerationWhenOnlyWarningFindingsArePresent() throws Exception {
+        // The stubbed Gemini server (see #geminiResponse) marks the body field WARNING
+        // instead of PASSED whenever the field text contains this marker.
+        String operationId = createOperation("MOB-304");
+        replaceOas(operationId, "Expected header\\nExpected body TRIGGER_WARNING");
+
+        mockMvc.perform(post("/api/v1/operations/{id}/validate", operationId)
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"expectedRevision\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("VALIDATED"))
+                .andExpect(jsonPath("$.canGenerate").value(true))
+                .andExpect(jsonPath("$.generateDisabledReasons").isEmpty())
+                .andExpect(jsonPath("$.findings[?(@.fieldName == 'oa[1].content.body' && @.validatorType == 'gemini-text')].status")
+                        .value("WARNING"));
     }
 
     @Test
@@ -151,9 +169,14 @@ class ValidationGatingIT {
     }
 
     private static void geminiResponse(HttpExchange exchange) throws IOException {
+        String requestText = new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        boolean triggersWarning = requestText.contains("TRIGGER_WARNING");
+        String bodyStatus = triggersWarning ? "WARNING" : "PASSED";
+        String bodyMessage = triggersWarning ? "\\\"Contains a placeholder marker.\\\"" : "null";
+        String bodySeverity = triggersWarning ? "\\\"MEDIUM\\\"" : "null";
         String body = """
-                {"candidates":[{"content":{"parts":[{"text":"{\\\"policyVersion\\\":\\\"gemini-text-v1\\\",\\\"findings\\\":[{\\\"fieldName\\\":\\\"oa[1].content.header\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].content.body\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].buttonText\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0}]}"}]}}]}
-                """;
+                {"candidates":[{"content":{"parts":[{"text":"{\\\"policyVersion\\\":\\\"gemini-text-v1\\\",\\\"findings\\\":[{\\\"fieldName\\\":\\\"oa[1].content.header\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].content.body\\\",\\\"status\\\":\\\"%s\\\",\\\"message\\\":%s,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":%s,\\\"confidence\\\":1.0},{\\\"fieldName\\\":\\\"oa[1].buttonText\\\",\\\"status\\\":\\\"PASSED\\\",\\\"message\\\":null,\\\"start\\\":null,\\\"end\\\":null,\\\"suggestion\\\":null,\\\"severity\\\":null,\\\"confidence\\\":1.0}]}"}]}}]}
+                """.formatted(bodyStatus, bodyMessage, bodySeverity);
         byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, bytes.length);

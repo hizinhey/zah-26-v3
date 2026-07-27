@@ -48,7 +48,7 @@ class TestPlanServiceTest {
         );
 
         TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
-        List<TestPlanService.TestCaseDto> cases = plan.cases();
+        List<TestPlanService.TestCaseDto> cases = plan.testCases();
 
         assertThat(plan.sourceRevision()).isEqualTo(operation.getRevision());
         assertThat(cases).hasSize(5);
@@ -77,9 +77,9 @@ class TestPlanServiceTest {
         TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
 
         assertThat(plan.status()).isEqualTo("GENERATION_FAILED");
-        assertThat(plan.cases()).extracting(TestPlanService.TestCaseDto::status)
+        assertThat(plan.testCases()).extracting(TestPlanService.TestCaseDto::status)
                 .containsExactly("READY", "READY", "NOT_READY", "READY", "READY");
-        assertThat(plan.cases().get(2).readinessReason()).isEqualTo("TypeScript failed");
+        assertThat(plan.testCases().get(2).reason()).isEqualTo("TypeScript failed");
     }
 
     @Test
@@ -98,9 +98,9 @@ class TestPlanServiceTest {
         TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
 
         assertThat(plan.status()).isEqualTo("GENERATION_FAILED");
-        assertThat(plan.cases()).allSatisfy(testCase -> {
+        assertThat(plan.testCases()).allSatisfy(testCase -> {
             assertThat(testCase.status()).isEqualTo("NOT_READY");
-            assertThat(testCase.readinessReason()).contains("catalog version");
+            assertThat(testCase.reason()).contains("catalog version");
         });
         assertThatThrownBy(() -> service.approve(plan.planId(), operation.getRevision()))
                 .isInstanceOf(IllegalStateException.class)

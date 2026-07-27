@@ -162,10 +162,10 @@ class MvpLifecycleIT {
         String planResponse = mockMvc.perform(post("/api/v1/operations/{id}/plans", operationId)
                         .contentType(APPLICATION_JSON).content("{\"expectedRevision\":3}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cases.length()").value(10))
+                .andExpect(jsonPath("$.testCases.length()").value(10))
                 .andReturn().getResponse().getContentAsString();
         String planId = JsonPath.read(planResponse, "$.planId");
-        List<Integer> caseOrders = JsonPath.read(planResponse, "$.cases[*].order");
+        List<Integer> caseOrders = JsonPath.read(planResponse, "$.testCases[*].order");
         assertThat(caseOrders.subList(0, 5)).containsExactly(1, 2, 3, 4, 5);
         assertThat(caseOrders.subList(5, 10)).containsExactly(1, 2, 3, 4, 5);
 
