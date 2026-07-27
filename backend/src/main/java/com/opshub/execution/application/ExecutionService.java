@@ -95,6 +95,29 @@ public class ExecutionService {
         return new ExecutionDto(executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey, "QUEUED", now);
     }
 
+    public ExecutionStatusDto findById(UUID executionId) {
+        ExecutionDto execution = jdbcTemplate.query("""
+                        SELECT id, operation_id, plan_id, source_revision, idempotency_key, status, queued_at
+                        FROM executions WHERE id = ?
+                        """, EXECUTION_ROW_MAPPER, executionId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ExecutionNotFoundException(executionId));
+        List<TestResultDto> results = jdbcTemplate.query("""
+                        SELECT id, test_case_id, attempt, status, duration_ms, error_category
+                        FROM test_results WHERE execution_id = ? ORDER BY test_case_id, attempt
+                        """, (rs, rowNum) -> new TestResultDto(
+                        (UUID) rs.getObject("id"), (UUID) rs.getObject("test_case_id"), rs.getInt("attempt"),
+                        rs.getString("status"), (Integer) rs.getObject("duration_ms"), rs.getString("error_category")),
+                executionId);
+        return new ExecutionStatusDto(execution, results);
+    }
+
+    public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Integer durationMs, String errorCategory) {
+    }
+
+    public record ExecutionStatusDto(ExecutionDto execution, List<TestResultDto> results) {
+    }
+
     public Optional<ExecutionDto> findByIdempotencyKey(String idempotencyKey) {
         List<ExecutionDto> rows = jdbcTemplate.query("""
                         SELECT id, operation_id, plan_id, source_revision, idempotency_key, status, queued_at

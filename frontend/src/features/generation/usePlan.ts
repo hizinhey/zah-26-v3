@@ -8,15 +8,23 @@ export function planQueryKey(operationId: string): readonly ["plan", string] {
 }
 
 /**
- * There is no GET endpoint for a test plan; the latest plan is whatever the
- * generate/approve mutations last wrote into the cache for this operation
- * (mirrors useValidationQuery's cache-only pattern in ../operations/useOperation).
+ * Seeded by useGeneratePlanMutation with the freshly generated plan. Once seeded, this
+ * refetches the real GET /api/v1/plans/{planId} endpoint so ExecuteScreen's REST-fallback
+ * refetch (see useExecutionChannel's invalidateQueries call) actually pulls current state
+ * instead of being a no-op against a permanently-disabled, always-rejecting query.
  */
 export function usePlanQuery(operationId: string): UseQueryResult<TestPlan> {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: planQueryKey(operationId),
-    queryFn: () => Promise.reject(new Error("no test plan has been generated yet")),
-    enabled: false,
+    queryFn: async () => {
+      const seeded = queryClient.getQueryData<TestPlan>(planQueryKey(operationId));
+      if (!seeded) {
+        throw new Error("no test plan has been generated yet");
+      }
+      return apiClient.getPlan(seeded.planId);
+    },
+    enabled: true,
     retry: false,
   });
 }

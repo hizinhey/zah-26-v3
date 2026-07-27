@@ -124,7 +124,7 @@ export type ApiError = OperationError | RevisionConflictError | ExecutionError;
 // contracts/schemas/hub-envelope-v1.json for the envelope/test-case shapes.
 // ---------------------------------------------------------------------------
 
-export type TestCaseCaseStatus = "READY" | "NOT_READY";
+export type TestCaseStatusValue = "READY" | "NOT_READY";
 
 export interface TemplateParametersV1 {
   oaName: string;
@@ -146,7 +146,7 @@ export interface GeneratedTestCase {
   templateVersion: number;
   templateSha256: string;
   parameters: TemplateParametersV1;
-  status: TestCaseCaseStatus;
+  status: TestCaseStatusValue;
   reason: string | null;
 }
 
@@ -179,6 +179,26 @@ export interface ExecutionResponse {
   planId: Uuid;
   sourceRevision: Revision;
   status: string;
+}
+
+/** One persisted test result row, as returned by GET /executions/{executionId}. */
+export interface ExecutionTestResult {
+  id: Uuid;
+  testCaseId: Uuid;
+  attempt: number;
+  status: TestResultStatus;
+  durationMs: number | null;
+  errorCategory: ErrorCategory | null;
+}
+
+/** GET /executions/{executionId} response: current status plus every recorded test result. */
+export interface ExecutionStatus {
+  id: Uuid;
+  operationId: Uuid;
+  planId: Uuid;
+  sourceRevision: Revision;
+  status: string;
+  results: ExecutionTestResult[];
 }
 
 // --- Hub envelope (browser-facing realtime feed; see useExecutionChannel) ---

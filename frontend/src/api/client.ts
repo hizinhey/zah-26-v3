@@ -3,6 +3,7 @@ import type {
   ApprovePlanRequest,
   CreateOperationRequest,
   ExecutionResponse,
+  ExecutionStatus,
   GeneratePlanRequest,
   Operation,
   ReplaceOasRequest,
@@ -92,6 +93,10 @@ export const apiClient = {
     });
   },
 
+  getPlan(planId: string): Promise<TestPlan> {
+    return request<TestPlan>(`/plans/${planId}`);
+  },
+
   approvePlan(planId: string, payload: ApprovePlanRequest): Promise<void> {
     return request<void>(`/plans/${planId}/approve`, {
       method: "POST",
@@ -104,5 +109,9 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  getExecution(executionId: string): Promise<ExecutionStatus> {
+    return request<ExecutionStatus>(`/executions/${executionId}`);
   },
 };

@@ -6,7 +6,7 @@ import { DisabledReason } from "../../components/DisabledReason";
 import { StatusBadge } from "../../components/StatusBadge";
 import { OPERATION_STEPS } from "../../app/router";
 import { ApiClientError } from "../../api/client";
-import { useOperationQuery } from "../operations/useOperation";
+import { isRevisionConflict, useOperationQuery } from "../operations/useOperation";
 import { usePlanQuery } from "../generation/usePlan";
 import { executionQueryKey, useExecutionQuery, useStartExecutionMutation } from "./useExecution";
 import { useExecutionChannel } from "../../realtime/useExecutionChannel";
@@ -147,11 +147,11 @@ export function ExecuteScreen(): ReactElement {
           setStartError("The approved plan changed. Refresh and confirm again before starting.");
           return;
         }
-        if (error.body.code === "REVISION_CONFLICT") {
-          setStartError(`This operation changed elsewhere (current revision ${error.body.currentRevision}). Refresh and try again.`);
-          await operationQuery.refetch();
-          return;
-        }
+      }
+      if (isRevisionConflict(error)) {
+        setStartError(`This operation changed elsewhere (current revision ${error.body.currentRevision}). Refresh and try again.`);
+        await operationQuery.refetch();
+        return;
       }
       throw error;
     }
@@ -260,7 +260,14 @@ export function ExecuteScreen(): ReactElement {
                           <td>{live?.durationMs != null ? `${(live.durationMs / 1000).toFixed(2)}s` : "—"}</td>
                           <td>
                             {isFailure ? (
-                              <a href={`#test-result-${testCase.testCaseId}`}>View Evidence</a>
+                              <button
+                                type="button"
+                                className={styles.evidenceUnavailable}
+                                disabled
+                                title="Evidence viewing isn't available yet. Evidence is captured on the Hub and can currently only be inspected there."
+                              >
+                                View Evidence
+                              </button>
                             ) : (
                               "—"
                             )}

@@ -190,3 +190,12 @@
   margin: 0;
   color: var(--ops-color-gray-700);
 }
+
+.evidenceUnavailable {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ops-color-gray-500);
+  cursor: not-allowed;
+  text-decoration: underline dotted;
+}

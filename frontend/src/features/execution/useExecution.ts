@@ -7,15 +7,35 @@ export function executionQueryKey(operationId: string): readonly ["execution", s
 }
 
 /**
- * There is no GET endpoint for execution status; the cached value here is
- * seeded by useStartExecutionMutation and kept current by useExecutionChannel
- * (WebSocket primary, REST-refresh-on-disconnect fallback per the brief).
+ * Seeded by useStartExecutionMutation with the just-started execution's id/status.
+ * Once seeded, this refetches GET /api/v1/executions/{executionId} - the real REST
+ * status endpoint - so both the WebSocket close handler's invalidateQueries call and
+ * the 3s poll fallback in useExecutionChannel genuinely pull fresh state, instead of
+ * the previous always-rejecting/disabled queryFn that made the fallback a no-op.
  */
 export function useExecutionQuery(operationId: string): UseQueryResult<ExecutionResponse> {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: executionQueryKey(operationId),
-    queryFn: () => Promise.reject(new Error("no execution has been started yet")),
-    enabled: false,
+    queryFn: async () => {
+      const seeded = queryClient.getQueryData<ExecutionResponse>(executionQueryKey(operationId));
+      if (!seeded) {
+        throw new Error("no execution has been started yet");
+      }
+      const status = await apiClient.getExecution(seeded.id);
+      return {
+        id: status.id,
+        operationId: status.operationId,
+        planId: status.planId,
+        sourceRevision: status.sourceRevision,
+        status: status.status,
+      } satisfies ExecutionResponse;
+    },
+    // enabled (not the previous permanently-disabled query): a query with enabled:false is
+    // skipped by invalidateQueries too, which is exactly what made the 3s REST-fallback poll
+    // in useExecutionChannel a no-op before this fix. Before an execution is seeded, queryFn
+    // above rejects immediately and harmlessly (nothing renders off .error here).
+    enabled: true,
     retry: false,
   });
 }

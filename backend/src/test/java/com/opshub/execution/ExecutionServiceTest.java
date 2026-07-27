@@ -235,6 +235,37 @@ class ExecutionServiceTest {
         assertThat(result).isEqualTo(UUID.fromString("060241da-e04f-3366-bf26-c1a67252bb48"));
     }
 
+    @Test
+    void findByIdReturnsExecutionStatusWithTestResultsIncludingDeterministicIds() {
+        UUID operationId = createDraftOperation("MOB-607");
+        UUID planId = approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-find-by-id");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        executionService.offerNextJob(hubId);
+        UUID testCaseId = jdbcTemplate.queryForObject(
+                "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
+        executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null)));
+
+        ExecutionService.ExecutionStatusDto status = executionService.findById(execution.id());
+
+        assertThat(status.execution().id()).isEqualTo(execution.id());
+        assertThat(status.results()).hasSize(1);
+        ExecutionService.TestResultDto result = status.results().get(0);
+        assertThat(result.testCaseId()).isEqualTo(testCaseId);
+        assertThat(result.status()).isEqualTo("PASSED");
+        UUID expectedTestResultId = UUID.nameUUIDFromBytes(
+                (execution.id() + ":" + testCaseId + ":1").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(result.id()).isEqualTo(expectedTestResultId);
+    }
+
+    @Test
+    void findByIdThrowsWhenExecutionDoesNotExist() {
+        assertThatThrownBy(() -> executionService.findById(UUID.randomUUID()))
+                .isInstanceOf(com.opshub.execution.application.ExecutionNotFoundException.class);
+    }
+
     private UUID createDraftOperation(String jiraId) {
         UUID operationId = UUID.randomUUID();
         jdbcTemplate.update("""

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getOperation: vi.fn(),
   generatePlan: vi.fn(),
   approvePlan: vi.fn(),
+  getPlan: vi.fn(),
 }));
 
 vi.mock("../../api/client", async () => {
@@ -89,6 +90,7 @@ function renderScreen(seedPlan?: TestPlan, seedOperation: Operation = operation(
   queryClient.setQueryData(operationQueryKey("op-1"), seedOperation);
   if (seedPlan) {
     queryClient.setQueryData(planQueryKey("op-1"), seedPlan);
+    mocks.getPlan.mockResolvedValue(seedPlan);
   }
   mocks.getOperation.mockResolvedValue(seedOperation);
 

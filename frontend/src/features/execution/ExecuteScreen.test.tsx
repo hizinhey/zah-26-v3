@@ -21,6 +21,8 @@ vi.mock("../../realtime/useExecutionChannel", () => ({
 const mocks = vi.hoisted(() => ({
   getOperation: vi.fn(),
   startExecution: vi.fn(),
+  getPlan: vi.fn(),
+  getExecution: vi.fn(),
 }));
 
 vi.mock("../../api/client", async () => {
@@ -115,8 +117,12 @@ function renderScreen(options: {
   }
   if (options.seedExecution) {
     queryClient.setQueryData(executionQueryKey("op-1"), options.seedExecution);
+    mocks.getExecution.mockResolvedValue({ ...options.seedExecution, results: [] });
   }
   mocks.getOperation.mockResolvedValue(seedOperation);
+  if (options.seedPlan) {
+    mocks.getPlan.mockResolvedValue(options.seedPlan);
+  }
 
   return {
     queryClient,
@@ -234,7 +240,7 @@ describe("ExecuteScreen", () => {
     expect(await screen.findByText(/Execution complete: 4 passed, 1 failed out of 5\./)).toBeInTheDocument();
   });
 
-  it("renders an evidence link for a failed test case", async () => {
+  it("shows a disabled evidence control with an explanatory tooltip for a failed test case (no browser-facing evidence viewer exists yet)", async () => {
     renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
     const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;
 
@@ -246,7 +252,9 @@ describe("ExecuteScreen", () => {
       payload: { executionId: "exec-1", testCaseId: "tc-1-1", attempt: 1, status: "FAILED", durationMs: 500, errorCategory: "ASSERTION_FAILURE" },
     });
 
-    expect(await screen.findByRole("link", { name: "View Evidence" })).toBeInTheDocument();
+    const evidenceButton = await screen.findByRole("button", { name: "View Evidence" });
+    expect(evidenceButton).toBeDisabled();
+    expect(evidenceButton).toHaveAttribute("title", expect.stringContaining("isn't available yet"));
   });
 
   it("switches to the Logs tab and shows accumulated log entries", async () => {

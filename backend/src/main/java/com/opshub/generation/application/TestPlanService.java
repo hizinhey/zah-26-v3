@@ -80,6 +80,41 @@ public class TestPlanService {
         return new TestPlanDto(planId, operationId, revision, catalogVersion, planStatus, "PENDING", List.copyOf(cases));
     }
 
+    public TestPlanDto findById(UUID planId) {
+        TestPlanRow plan = jdbcTemplate.query("""
+                        SELECT id, operation_id, source_revision, template_catalog_version, status, approval_status
+                        FROM test_plans WHERE id = ?
+                        """, rs -> rs.next()
+                        ? new TestPlanRow((UUID) rs.getObject("id"), (UUID) rs.getObject("operation_id"),
+                                rs.getInt("source_revision"), rs.getString("template_catalog_version"),
+                                rs.getString("status"), rs.getString("approval_status"))
+                        : null,
+                planId);
+        if (plan == null) {
+            throw new TestPlanNotFoundException(planId);
+        }
+        List<TestCaseDto> cases = jdbcTemplate.query("""
+                        SELECT id, plan_id, oa_order, case_order, template_id, template_version, template_sha256, parameters, status
+                        FROM test_cases WHERE plan_id = ? ORDER BY oa_order, case_order
+                        """, (rs, rowNum) -> {
+                    try {
+                        Object parameters = objectMapper.readValue(rs.getString("parameters"), TemplateParameters.class);
+                        return new TestCaseDto(
+                                (UUID) rs.getObject("id"), (UUID) rs.getObject("plan_id"), rs.getInt("oa_order"), rs.getInt("case_order"),
+                                rs.getString("template_id"), rs.getInt("template_version"), rs.getString("template_sha256"),
+                                (TemplateParameters) parameters, rs.getString("status"), null);
+                    } catch (JsonProcessingException exception) {
+                        throw new IllegalStateException("Could not parse stored template parameters", exception);
+                    }
+                }, planId);
+        return new TestPlanDto(plan.id(), plan.operationId(), plan.sourceRevision(), plan.templateCatalogVersion(),
+                plan.status(), plan.approvalStatus(), cases);
+    }
+
+    private record TestPlanRow(UUID id, UUID operationId, int sourceRevision, String templateCatalogVersion,
+                                String status, String approvalStatus) {
+    }
+
     @Transactional
     public void approve(UUID planId, int revision) {
         int approved = jdbcTemplate.update("""
