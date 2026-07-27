@@ -297,7 +297,7 @@ class MvpLifecycleIT {
         mockMvc.perform(get("/api/v1/executions/{id}", executionId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.results.length()").value(13)); // 1 + 2 + 10 results recorded
+                .andExpect(jsonPath("$.results.length()").value(11)); // 1 (assertion fail) + 2 (infra retry attempts) + 8 (remaining cases) results recorded
 
         assertThat(operationUuid).isNotNull(); // keeps the operation id in scope/documented above
     }
