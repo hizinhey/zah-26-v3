@@ -9,6 +9,7 @@ import com.opshub.operation.application.RevisionConflictException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,12 +110,15 @@ public class ExecutionService {
                         FROM test_results WHERE execution_id = ? ORDER BY test_case_id, attempt
                         """, (rs, rowNum) -> new TestResultDto(
                         (UUID) rs.getObject("id"), (UUID) rs.getObject("test_case_id"), rs.getInt("attempt"),
-                        rs.getString("status"), (Integer) rs.getObject("duration_ms"), rs.getString("error_category")),
+                        rs.getString("status"), (Long) rs.getObject("duration_ms"), rs.getString("error_category")),
                 executionId);
         return new ExecutionStatusDto(execution, results);
     }
 
-    public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Integer durationMs, String errorCategory) {
+    // I6 fix: duration_ms is NOT NULL BIGINT on the wire and in the DB (V4__widen_duration_ms.sql)
+    // - read as Long, not the previously nullable Integer, which was the more clearly wrong side
+    // of that mismatch (a NOT NULL column read into a nullable narrower type).
+    public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory) {
     }
 
     public record ExecutionStatusDto(ExecutionDto execution, List<TestResultDto> results) {
@@ -257,9 +261,59 @@ public class ExecutionService {
     private void requireMonotonic(UUID executionId, Instant timestamp) {
         Instant previous = lastMessageTimestamps.get(executionId);
         if (previous != null && timestamp.isBefore(previous)) {
-            throw new IllegalStateException("Message received out of order for execution " + executionId);
+            // I5 fix: a dedicated exception (mapped to 409 by the controllers, not the bare
+            // 500 an unmapped IllegalStateException produced) - a 5xx looks retryable to the
+            // Hub's Outbox.flush, which would then retry a permanently-rejected envelope forever.
+            throw new MonotonicOrderViolationException(executionId,
+                    "Message received out of order for execution " + executionId);
         }
         lastMessageTimestamps.put(executionId, timestamp);
+    }
+
+    /**
+     * Grace period past a lease's expiry before its execution is considered abandoned rather
+     * than merely awaiting re-offer. {@link LeaseService#nextOfferableExecution} already makes a
+     * RUNNING execution with an expired lease re-offerable immediately (so a Hub that's still
+     * alive but slow can pick it back up); this sweep only steps in once that hasn't happened for
+     * a while, on the assumption the Hub that held the lease is actually gone.
+     */
+    public static final java.time.Duration ABANDONED_EXECUTION_GRACE_PERIOD = java.time.Duration.ofMinutes(10);
+
+    /**
+     * I4 fix: previously nothing ever marked an execution FAILED if its lease expired with no
+     * Hub reclaiming it - a dead Hub mid-run left the execution RUNNING forever, endlessly
+     * re-offered from case 1 by {@link LeaseService#nextOfferableExecution}. Runs periodically
+     * (Spring {@code @Scheduled}, matching how this codebase would otherwise introduce a
+     * background task - there was no prior {@code @Scheduled} usage to follow, so this
+     * establishes the pattern) and fails any RUNNING execution whose most recent lease expired
+     * more than {@link #ABANDONED_EXECUTION_GRACE_PERIOD} ago with nothing renewing it since.
+     */
+    @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
+    @Transactional
+    public void sweepAbandonedExecutions() {
+        Instant cutoff = Instant.now().minus(ABANDONED_EXECUTION_GRACE_PERIOD);
+        List<UUID> abandoned = jdbcTemplate.query("""
+                        SELECT execution.id
+                        FROM executions execution
+                        WHERE execution.status = 'RUNNING'
+                          AND execution.finished_at IS NULL
+                          AND EXISTS (
+                              SELECT 1 FROM job_leases lease
+                              WHERE lease.execution_id = execution.id AND lease.expires_at <= ?
+                          )
+                          AND NOT EXISTS (
+                              SELECT 1 FROM job_leases lease
+                              WHERE lease.execution_id = execution.id AND lease.expires_at > ?
+                          )
+                        """, (rs, rowNum) -> (UUID) rs.getObject("id"), cutoff, Instant.now());
+
+        for (UUID executionId : abandoned) {
+            jdbcTemplate.update("""
+                            UPDATE executions SET status = 'FAILED', finished_at = ? WHERE id = ?
+                            """, Instant.now(), executionId);
+            leaseService.release(executionId);
+            lastMessageTimestamps.remove(executionId);
+        }
     }
 
     private void requireHubOnline(UUID hubId) {
@@ -278,13 +332,19 @@ public class ExecutionService {
                         : null,
                 executionId);
         List<HubPayloads.TestCase> testCases = jdbcTemplate.query("""
-                        SELECT id, case_order, template_id, template_version, parameters
-                        FROM test_cases WHERE plan_id = ? ORDER BY oa_order, case_order
+                        SELECT test_case.id, test_case.oa_order, test_case.case_order, test_case.template_id,
+                               test_case.template_version, test_case.parameters, oa.oa_name
+                        FROM test_cases test_case
+                        JOIN test_plans plan ON plan.id = test_case.plan_id
+                        JOIN official_accounts oa ON oa.operation_id = plan.operation_id AND oa.oa_order = test_case.oa_order
+                        WHERE test_case.plan_id = ?
+                        ORDER BY test_case.oa_order, test_case.case_order
                         """, (rs, rowNum) -> {
                     try {
                         JsonNode parameters = objectMapper.readTree(rs.getString("parameters"));
                         return new HubPayloads.TestCase(
-                                (UUID) rs.getObject("id"), rs.getInt("case_order"), rs.getString("template_id"),
+                                (UUID) rs.getObject("id"), rs.getInt("oa_order"), rs.getString("oa_name"),
+                                rs.getInt("case_order"), rs.getString("template_id"),
                                 rs.getInt("template_version"), objectMapper.convertValue(parameters, Object.class));
                     } catch (Exception exception) {
                         throw new IllegalStateException("Could not parse stored template parameters", exception);

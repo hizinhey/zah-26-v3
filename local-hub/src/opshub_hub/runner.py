@@ -10,6 +10,7 @@ with local files preserved until the upload is acknowledged.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -41,12 +42,19 @@ from opshub_hub.models import (
 from opshub_hub.outbox import Outbox
 from opshub_hub.templates import TemplateCatalog, materialize_execution_dir
 
+logger = logging.getLogger("opshub_hub.runner")
+
 
 @dataclass(frozen=True)
 class ProcessResult:
     returncode: int
     stdout: str = ""
     stderr: str = ""
+    timed_out: bool = False
+    """Structural signal (I3 fix) that the launcher killed the subprocess for exceeding its
+    timeout, rather than the process exiting on its own with a non-zero code. Classification
+    checks this first, so a timeout is never at the mercy of whether its synthetic stderr
+    message happens to match one of classification.py's INFRASTRUCTURE regex patterns."""
 
 
 class SubprocessLauncher(Protocol):
@@ -134,7 +142,10 @@ class Runner:
             record = self._execute_attempt(test_case, spec_path, attempt=1, logs_dir=logs_dir)
             summary.attempts.append(record)
 
-            if record.error_category == ErrorCategory.INFRASTRUCTURE:
+            # TIMEOUT is retryable exactly like INFRASTRUCTURE (I3 fix) - both are
+            # infra/environment trouble unrelated to the OA under test, eligible for the one
+            # allowed retry, with an Appium session reset in between.
+            if record.error_category in (ErrorCategory.INFRASTRUCTURE, ErrorCategory.TIMEOUT):
                 if self._reset_appium_session is not None:
                     self._reset_appium_session()
                 record = self._execute_attempt(test_case, spec_path, attempt=2, logs_dir=logs_dir)
@@ -180,10 +191,16 @@ class Runner:
             status = TestResultStatus.PASSED
             category: ErrorCategory | None = None
         else:
-            failure = classify_failure(returncode=process.returncode, stdout=process.stdout, stderr=process.stderr)
+            failure = classify_failure(
+                returncode=process.returncode, stdout=process.stdout, stderr=process.stderr,
+                timed_out=process.timed_out,
+            )
             if failure is FailureCategory.INFRASTRUCTURE:
                 status = TestResultStatus.ERROR
                 category = ErrorCategory.INFRASTRUCTURE
+            elif failure is FailureCategory.TIMEOUT:
+                status = TestResultStatus.ERROR
+                category = ErrorCategory.TIMEOUT
             else:
                 status = TestResultStatus.FAILED
                 category = ErrorCategory.ASSERTION_FAILURE
@@ -237,6 +254,15 @@ class Runner:
         left on disk if the upload fails or no uploader is configured, so it can
         be retried without losing evidence."""
         if self._screenshot_capturer is None:
+            # Not a silent no-op (C3): make it visible in the Hub's own logs that evidence is
+            # not being captured for this test result, so a misconfigured/omitted capturer is
+            # diagnosable from Hub logs alone rather than showing up only as "no evidence" much
+            # later, in the backend or UI.
+            logger.warning(
+                "No screenshot_capturer configured; skipping evidence capture for test case %s attempt %s.",
+                test_case.testCaseId,
+                record.attempt,
+            )
             return
         destination = evidence_dir / f"{test_case.testCaseId}-attempt{record.attempt}.png"
         try:

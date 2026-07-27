@@ -261,6 +261,48 @@ class ExecutionServiceTest {
     }
 
     @Test
+    void sweepAbandonedExecutionsFailsARunningExecutionWhoseLeaseExpiredWellPastTheGracePeriod() {
+        UUID operationId = createDraftOperation("MOB-610");
+        approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-abandoned");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        assertThat(executionService.offerNextJob(hubId)).isPresent();
+
+        // Simulate a Hub that died mid-run: its lease expired long past the sweep's grace period,
+        // and nothing ever renewed or replaced it.
+        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?",
+                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), hubId);
+
+        executionService.sweepAbandonedExecutions();
+
+        String status = jdbcTemplate.queryForObject(
+                "SELECT status FROM executions WHERE id = ?", String.class, execution.id());
+        assertThat(status).isEqualTo("FAILED");
+    }
+
+    @Test
+    void sweepAbandonedExecutionsLeavesARecentlyExpiredLeaseAloneWithinTheGracePeriod() {
+        UUID operationId = createDraftOperation("MOB-611");
+        approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-not-yet-abandoned");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        assertThat(executionService.offerNextJob(hubId)).isPresent();
+
+        // Lease expired a moment ago, well within the grace period - still eligible for re-offer,
+        // not yet abandoned.
+        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?",
+                Instant.now().minusSeconds(5), hubId);
+
+        executionService.sweepAbandonedExecutions();
+
+        String status = jdbcTemplate.queryForObject(
+                "SELECT status FROM executions WHERE id = ?", String.class, execution.id());
+        assertThat(status).isEqualTo("RUNNING");
+    }
+
+    @Test
     void findByIdThrowsWhenExecutionDoesNotExist() {
         assertThatThrownBy(() -> executionService.findById(UUID.randomUUID()))
                 .isInstanceOf(com.opshub.execution.application.ExecutionNotFoundException.class);
@@ -277,6 +319,13 @@ class ExecutionServiceTest {
 
     private UUID approvePlan(UUID operationId, int revision) {
         UUID planId = UUID.randomUUID();
+        // buildJobOfferedEnvelope joins test_cases -> official_accounts on (operation_id,
+        // oa_order) to populate the C1 oaOrder/oaName fields, so a row here is required for
+        // offerNextJob to return any test cases at all.
+        jdbcTemplate.update("""
+                        INSERT INTO official_accounts (id, operation_id, oa_order, platform, oa_name, thumbnail_url, content, button_text, redirect_url)
+                        VALUES (?, ?, 1, 'ANDROID', 'Test OA', 'https://example.test/thumb.png', 'content', 'Open', 'https://example.test/redirect')
+                        """, UUID.randomUUID(), operationId);
         jdbcTemplate.update("""
                         INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
                         VALUES (?, ?, ?, 'catalog-v1', 'READY', 'APPROVED')

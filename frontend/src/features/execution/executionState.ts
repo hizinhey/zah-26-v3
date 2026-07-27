@@ -1,5 +1,6 @@
 import type {
   ErrorCategory,
+  ExecutionTestResult,
   GeneratedTestCase,
   HubEnvelopeV1,
   TestCaseStatus,
@@ -93,4 +94,46 @@ export function applyEnvelope(state: ExecutionState, envelope: HubEnvelopeV1): E
   }
 
   return state;
+}
+
+/**
+ * Merges REST-fetched `results` (GET /api/v1/executions/{id}) into the reducer's case map,
+ * the same shape `applyEnvelope`'s TEST_RESULT branch produces. This is what makes the 3s
+ * REST-poll fallback (useExecutionChannel) actually update the table when the browser
+ * WebSocket can't connect (C2 fix) - without this, `results` was fetched but never applied
+ * to any state the table reads from, so every row stayed PENDING forever.
+ *
+ * A result is only applied if it represents progress at least as advanced as what's already
+ * known for that test case (higher attempt, or same attempt with a terminal status), so an
+ * out-of-order REST fetch can never regress a case that a later envelope already advanced.
+ */
+export function hydrateFromResults(state: ExecutionState, results: ExecutionTestResult[]): ExecutionState {
+  let cases = state.cases;
+  let changed = false;
+  for (const result of results) {
+    const previous = cases[result.testCaseId] ?? initialCaseState();
+    if (previous.attempt != null && previous.attempt > result.attempt) {
+      continue;
+    }
+    if (
+      previous.attempt === result.attempt &&
+      previous.status === result.status &&
+      previous.durationMs === result.durationMs &&
+      previous.errorCategory === result.errorCategory
+    ) {
+      continue;
+    }
+    if (!changed) {
+      cases = { ...cases };
+      changed = true;
+    }
+    cases[result.testCaseId] = {
+      ...previous,
+      status: result.status,
+      attempt: result.attempt,
+      durationMs: result.durationMs,
+      errorCategory: result.errorCategory,
+    };
+  }
+  return changed ? { ...state, cases } : state;
 }

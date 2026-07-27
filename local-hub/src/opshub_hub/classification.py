@@ -37,16 +37,27 @@ _INFRASTRUCTURE_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 class FailureCategory(str, Enum):
     ASSERTION = "ASSERTION"
     INFRASTRUCTURE = "INFRASTRUCTURE"
+    TIMEOUT = "TIMEOUT"
 
 
-def classify_failure(*, returncode: int, stdout: str, stderr: str) -> FailureCategory:
+def classify_failure(*, returncode: int, stdout: str, stderr: str, timed_out: bool = False) -> FailureCategory:
     """Classify a non-zero-exit spec run.
 
     Only called when the process did not exit cleanly. Anything that looks like
     Appium/session/device/network trouble is INFRASTRUCTURE (eligible for one
     retry); everything else — including plain Mocha assertion failures — is
     ASSERTION (never retried).
+
+    `timed_out=True` (I3 fix) is a structural signal from the launcher - not a string
+    pattern match - that the spec subprocess was killed for exceeding its timeout. This is
+    checked first and unconditionally maps to TIMEOUT (retryable, like INFRASTRUCTURE),
+    regardless of whatever text ended up in stdout/stderr, since relying on the launcher's
+    synthetic "Timed out after {timeout}s..." stderr message to also match one of the
+    INFRASTRUCTURE patterns above was fragile and previously fell through to ASSERTION
+    (never retried) because none of those patterns matched it.
     """
+    if timed_out:
+        return FailureCategory.TIMEOUT
     combined = f"{stdout}\n{stderr}"
     for pattern in _INFRASTRUCTURE_PATTERNS:
         if pattern.search(combined):

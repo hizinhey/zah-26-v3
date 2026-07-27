@@ -14,8 +14,17 @@ export interface WebSocketLike {
 }
 
 export interface UseExecutionChannelOptions {
-  /** WebSocket URL to connect to, or null to stay disconnected (e.g. before an execution exists). */
-  url: string | null;
+  /**
+   * WebSocket URL to connect to.
+   *
+   * - `undefined`: stay fully disconnected, no polling either (e.g. before an execution exists).
+   * - `null`: skip the WebSocket entirely and go straight to REST-poll-only mode at
+   *   `pollIntervalMs`. Used when no browser-facing WS endpoint exists yet (see
+   *   ExecuteScreen.tsx's `browserExecutionChannelUrl`, C2) - avoids reconnect-storming against
+   *   an endpoint that will never accept the connection.
+   * - a string: connect over WebSocket, falling back to REST-poll on close/error as before.
+   */
+  url: string | null | undefined;
   queryClient: QueryClient;
   /** Query key invalidated on the REST polling fallback while the socket is closed. */
   invalidateKey: QueryKey;
@@ -57,7 +66,7 @@ export function useExecutionChannel(options: UseExecutionChannelOptions): UseExe
   onEnvelopeRef.current = onEnvelope;
 
   useEffect(() => {
-    if (!url) {
+    if (url === undefined) {
       setConnectionState("closed");
       setIsPolling(false);
       return;
@@ -104,11 +113,11 @@ export function useExecutionChannel(options: UseExecutionChannelOptions): UseExe
     }
 
     function connect(): void {
-      if (disposed) {
+      if (disposed || !url) {
         return;
       }
       setConnectionState("connecting");
-      const next = open(url as string);
+      const next = open(url);
       socket = next;
       next.onopen = () => {
         if (disposed) {
@@ -130,7 +139,14 @@ export function useExecutionChannel(options: UseExecutionChannelOptions): UseExe
       };
     }
 
-    connect();
+    if (url === null) {
+      // Poll-only mode: skip the WebSocket entirely and start polling immediately, rather than
+      // waiting for a connect/close cycle against an endpoint that doesn't exist.
+      setConnectionState("closed");
+      startPolling();
+    } else {
+      connect();
+    }
 
     return () => {
       disposed = true;

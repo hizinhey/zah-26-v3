@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useReducer, useState, type ReactElement } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StepProgress } from "../../components/StepProgress";
@@ -10,22 +10,25 @@ import { isRevisionConflict, useOperationQuery } from "../operations/useOperatio
 import { usePlanQuery } from "../generation/usePlan";
 import { executionQueryKey, useExecutionQuery, useStartExecutionMutation } from "./useExecution";
 import { useExecutionChannel } from "../../realtime/useExecutionChannel";
-import { applyEnvelope, seedExecutionState, type ExecutionState } from "./executionState";
+import { applyEnvelope, hydrateFromResults, seedExecutionState, type ExecutionState } from "./executionState";
 import { ExecutionQueue, type QueueOa, type QueueStatus } from "./ExecutionQueue";
 import { ExecutionLog } from "./ExecutionLog";
 import { TEST_CASE_CATALOG, testCaseLabel } from "../generation/testCaseCatalog";
-import type { GeneratedTestCase, HubEnvelopeV1 } from "../../api/generated";
+import type { ExecutionTestResult, GeneratedTestCase, HubEnvelopeV1 } from "../../api/generated";
 import styles from "./ExecuteScreen.module.css";
 
 type Tab = "current" | "script" | "logs";
 
-function browserExecutionChannelUrl(executionId: string): string {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  // No browser-facing WebSocket path is defined in contracts/openapi/opshub-v1.yaml yet
-  // (only the Hub-facing /ws/v1/hubs/{hubId} exists); this follows the same
-  // HubEnvelopeV1 envelope pattern over a plausible browser-scoped path, per
-  // task guidance to build against the envelope contract and note the gap.
-  return `${protocol}//${window.location.host}/ws/v1/executions/${executionId}`;
+// C2 fix: no browser-facing WebSocket endpoint exists on the backend (only the Hub-facing
+// /ws/v1/hubs/{hubId} does - see HubWebSocketConfig.java). Previously this hook still built a
+// /ws/v1/executions/{id} URL and handed it to useExecutionChannel, which meant the browser
+// opened a WebSocket that always failed to connect and reconnected in a storm every few
+// seconds, on top of the 3s REST-poll fallback. Force `null` here so useExecutionChannel goes
+// straight to REST-poll-only until a real browser-facing WS/SSE endpoint is added.
+// TODO(remove-when-browser-ws-exists): once a real endpoint exists, restore something like
+// `${protocol}//${window.location.host}/ws/v1/executions/${executionId}` here.
+function browserExecutionChannelUrl(_executionId: string): string | null {
+  return null;
 }
 
 function groupByOa(cases: GeneratedTestCase[]): Map<number, GeneratedTestCase[]> {
@@ -45,9 +48,17 @@ function isTerminal(status: string): boolean {
   return status === "PASSED" || status === "FAILED" || status === "ERROR";
 }
 
-function reducer(state: ExecutionState, action: { type: "seed"; testCases: GeneratedTestCase[] } | { type: "envelope"; envelope: HubEnvelopeV1 }): ExecutionState {
+type Action =
+  | { type: "seed"; testCases: GeneratedTestCase[] }
+  | { type: "envelope"; envelope: HubEnvelopeV1 }
+  | { type: "hydrate"; results: ExecutionTestResult[] };
+
+function reducer(state: ExecutionState, action: Action): ExecutionState {
   if (action.type === "seed") {
     return seedExecutionState(action.testCases);
+  }
+  if (action.type === "hydrate") {
+    return hydrateFromResults(state, action.results);
   }
   return applyEnvelope(state, action.envelope);
 }
@@ -69,13 +80,25 @@ export function ExecuteScreen(): ReactElement {
   const plan = planQuery.data;
   const execution = executionQuery.data;
 
-  const channelUrl = execution ? browserExecutionChannelUrl(execution.id) : null;
+  // undefined = no execution yet (stay fully disconnected); null = execution exists but there's
+  // no browser-facing WS endpoint yet, so go straight to REST-poll-only (see C2 fix above).
+  const channelUrl = execution ? browserExecutionChannelUrl(execution.id) : undefined;
   const { connectionState, isPolling } = useExecutionChannel({
     url: channelUrl,
     queryClient,
     invalidateKey: executionQueryKey(operationId),
     onEnvelope: (envelope) => dispatch({ type: "envelope", envelope }),
   });
+
+  // C2 fix: merge every REST-fetched `results` row into the reducer's case state whenever the
+  // query refetches (the 3s poll fallback, or an initial fetch right after starting). Without
+  // this, `results` was fetched but nothing ever applied it to the state the table renders from.
+  useEffect(() => {
+    if (execution && "results" in execution && execution.results) {
+      dispatch({ type: "hydrate", results: execution.results });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [execution]);
 
   const byOa = useMemo(() => groupByOa(plan?.testCases ?? []), [plan]);
   const oaOrders = useMemo(() => Array.from(byOa.keys()).sort((a, b) => a - b), [byOa]);

@@ -235,6 +235,15 @@ class MvpLifecycleIT {
         UUID executionId = jobPayload.executionId();
         assertThat(jobPayload.testCases()).hasSize(10);
 
+        // Cross-language contract fixture (C1 item 7): write the *actual* multi-OA JOB_OFFERED
+        // envelope this backend produces to a fixture file that
+        // local-hub/tests/integration/test_backend_contract.py parses with
+        // JobOfferedPayload.model_validate - this is the one test that crosses the Java/Python
+        // boundary for real and would have caught the flat-vs-grouped contract mismatch (C1).
+        java.nio.file.Path fixturePath = java.nio.file.Paths.get(
+                "..", "local-hub", "tests", "fixtures", "job_offered_multi_oa.json");
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(fixturePath.toFile(), offer);
+
         // Only a single active job may be leased per Hub at a time (sequential execution).
         ResponseEntity<String> noSecondOffer = restTemplate.exchange(
                 "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=1",
@@ -286,6 +295,7 @@ class MvpLifecycleIT {
                 .multipart("/api/v1/test-results/{id}/evidence", passedTestResultId);
         mockMvc.perform(uploadRequest
                         .file(evidenceFile)
+                        .header("X-Hub-Token", HUB_TOKEN)
                         .param("evidenceType", "LOG")
                         .param("declaredSize", String.valueOf(evidenceBytes.length))
                         .param("declaredSha256", sha256))

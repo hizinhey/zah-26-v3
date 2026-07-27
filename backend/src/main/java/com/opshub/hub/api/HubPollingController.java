@@ -2,6 +2,7 @@ package com.opshub.hub.api;
 
 import com.opshub.execution.application.ExecutionService;
 import com.opshub.execution.application.HubNotOnlineException;
+import com.opshub.execution.application.MonotonicOrderViolationException;
 import com.opshub.hub.application.HubConnectionService;
 import com.opshub.hub.application.HubProperties;
 import com.opshub.hub.application.HubTokenValidator;
@@ -123,5 +124,17 @@ class HubPollingErrorHandler {
     @ExceptionHandler(HubNotOnlineException.class)
     ResponseEntity<Void> hubOffline() {
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+
+    // I5 fix: 409 with a distinct error code (not a bare 500) so the Hub's Outbox.flush can
+    // recognize this as a permanent rejection of this specific envelope and drop it, rather
+    // than retrying it forever the way it would for a genuine 5xx.
+    @ExceptionHandler(MonotonicOrderViolationException.class)
+    ResponseEntity<ErrorBody> outOfOrder(MonotonicOrderViolationException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorBody("MESSAGE_OUT_OF_ORDER", exception.getMessage()));
+    }
+
+    record ErrorBody(String code, String message) {
     }
 }

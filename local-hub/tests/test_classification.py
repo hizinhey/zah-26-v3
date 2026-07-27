@@ -32,3 +32,18 @@ def test_network_econnrefused_is_classified_as_infrastructure():
 def test_generic_nonzero_exit_without_infra_signals_is_assertion():
     category = classify_failure(returncode=1, stdout="Error: element not found in time", stderr="")
     assert category is FailureCategory.ASSERTION
+
+
+def test_timed_out_flag_is_classified_as_timeout_regardless_of_message_text(): # I3 regression
+    # The synthetic message main.py's launcher produces on subprocess.TimeoutExpired doesn't
+    # match any INFRASTRUCTURE pattern - the structural `timed_out=True` flag is what must
+    # drive the classification, not the message text.
+    stderr = "\nTimed out after 30s waiting for the spec to finish."
+    category = classify_failure(returncode=-1, stdout="", stderr=stderr, timed_out=True)
+    assert category is FailureCategory.TIMEOUT
+
+
+def test_timed_out_flag_wins_even_if_message_also_looks_like_infrastructure():
+    stderr = "session not created\nTimed out after 30s waiting for the spec to finish."
+    category = classify_failure(returncode=-1, stdout="", stderr=stderr, timed_out=True)
+    assert category is FailureCategory.TIMEOUT

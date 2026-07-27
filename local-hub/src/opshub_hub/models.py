@@ -59,6 +59,8 @@ class TemplateParametersV1(StrictModel):
 
 class TestCase(StrictModel):
     testCaseId: UUID
+    oaOrder: int = Field(ge=1)
+    oaName: str = Field(min_length=1)
     order: int = Field(ge=1)
     templateId: str = Field(min_length=1)
     templateVersion: int = Field(ge=1)
@@ -87,24 +89,42 @@ class JobOfferedPayload(StrictModel):
     @field_validator("testCases")
     @classmethod
     def validate_ordered_test_cases(cls, value: list[TestCase]) -> list[TestCase]:
-        expected_len = len(ORDERED_TEST_CASE_TEMPLATE_IDS)
-        if len(value) != expected_len:
+        group_size = len(ORDERED_TEST_CASE_TEMPLATE_IDS)
+        if len(value) == 0 or len(value) % group_size != 0:
             raise ValueError(
-                f"testCases must contain exactly {expected_len} items, got {len(value)}"
+                f"testCases must contain a positive multiple of {group_size} items "
+                f"(one group of {group_size} per OA), got {len(value)}"
             )
-        for index, (test_case, expected_template_id) in enumerate(
-            zip(value, ORDERED_TEST_CASE_TEMPLATE_IDS)
-        ):
-            expected_order = index + 1
-            if test_case.order != expected_order:
+
+        num_groups = len(value) // group_size
+        for group_index in range(num_groups):
+            group = value[group_index * group_size:(group_index + 1) * group_size]
+            expected_oa_order = group_index + 1
+            group_oa_order = group[0].oaOrder
+            if group_oa_order != expected_oa_order:
                 raise ValueError(
-                    f"testCases[{index}].order must be {expected_order}, got {test_case.order}"
+                    f"testCases group {group_index} must have oaOrder {expected_oa_order}, "
+                    f"got {group_oa_order}"
                 )
-            if test_case.templateId != expected_template_id:
-                raise ValueError(
-                    f"testCases[{index}].templateId must be '{expected_template_id}', "
-                    f"got '{test_case.templateId}'"
-                )
+            for offset, (test_case, expected_template_id) in enumerate(
+                zip(group, ORDERED_TEST_CASE_TEMPLATE_IDS)
+            ):
+                expected_order = offset + 1
+                if test_case.oaOrder != group_oa_order:
+                    raise ValueError(
+                        f"testCases group {group_index} has inconsistent oaOrder: "
+                        f"expected {group_oa_order}, got {test_case.oaOrder} at position {offset}"
+                    )
+                if test_case.order != expected_order:
+                    raise ValueError(
+                        f"testCases group {group_index} position {offset}: order must be "
+                        f"{expected_order}, got {test_case.order}"
+                    )
+                if test_case.templateId != expected_template_id:
+                    raise ValueError(
+                        f"testCases group {group_index} position {offset}: templateId must be "
+                        f"'{expected_template_id}', got '{test_case.templateId}'"
+                    )
         return value
 
 

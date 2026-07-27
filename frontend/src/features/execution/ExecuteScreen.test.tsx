@@ -162,8 +162,9 @@ describe("ExecuteScreen", () => {
     expect(screen.getByRole("note")).toHaveTextContent(/Confirm the test plan/);
   });
 
-  it("starts execution and connects the realtime channel", async () => {
+  it("starts execution and switches the realtime channel to REST-poll-only mode (no browser-facing WS endpoint exists yet)", async () => {
     mocks.startExecution.mockResolvedValue(execution());
+    mocks.getExecution.mockResolvedValue({ ...execution(), results: [] });
     renderScreen({ seedPlan: plan() });
 
     await userEvent.click(screen.getByRole("button", { name: "Start Execution" }));
@@ -176,7 +177,27 @@ describe("ExecuteScreen", () => {
     );
     await waitFor(() => expect(channelSpy).toHaveBeenCalled());
     const lastCall = channelSpy.mock.calls[channelSpy.mock.calls.length - 1][0];
-    expect(lastCall.url).toContain("exec-1");
+    // C2 fix: url is null (poll-only), not a doomed /ws/v1/executions/{id} connection.
+    expect(lastCall.url).toBeNull();
+  });
+
+  it("updates the table from the REST-poll fallback when results are fetched (C2: the poll path, not the WebSocket)", async () => {
+    const { queryClient } = renderScreen({ seedPlan: plan(), seedExecution: execution() });
+    // Let the initial fetch (results: [], wired up by renderScreen) settle first.
+    await waitFor(() => expect(mocks.getExecution).toHaveBeenCalled());
+
+    // Now simulate exactly what useExecutionChannel's 3s REST-poll fallback does: the backend
+    // has since recorded a result, and a refetch of the same query key pulls it in.
+    mocks.getExecution.mockResolvedValue({
+      ...execution(),
+      results: [
+        { id: "r1", testCaseId: "tc-1-1", attempt: 1, status: "PASSED", durationMs: 1234, errorCategory: null },
+      ],
+    });
+    await queryClient.refetchQueries({ queryKey: executionQueryKey("op-1") });
+
+    expect(await screen.findByText("1.23s")).toBeInTheDocument();
+    expect(screen.getByText("Passed")).toBeInTheDocument();
   });
 
   it("shows a Hub-not-online message and keeps Start enabled to retry, without navigating away", async () => {

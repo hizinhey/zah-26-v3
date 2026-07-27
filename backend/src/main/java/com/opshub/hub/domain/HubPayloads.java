@@ -12,6 +12,8 @@ public final class HubPayloads {
 
     public record TestCase(
             UUID testCaseId,
+            int oaOrder,
+            String oaName,
             int order,
             String templateId,
             int templateVersion,

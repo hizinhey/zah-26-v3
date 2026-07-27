@@ -28,6 +28,8 @@ def job_offered_payload():
         "testCases": [
             {
                 "testCaseId": f"00000000-0000-4000-8000-00000000000{order}",
+                "oaOrder": 1,
+                "oaName": "zBusiness",
                 "order": order,
                 "templateId": template_id,
                 "templateVersion": 1,
@@ -142,11 +144,28 @@ def test_job_offered_requires_exactly_five_fixed_cases(schema, validator):
     assert list(validator(schema).iter_errors(payload))
 
 
-def test_job_offered_requires_the_fixed_case_order(schema, validator):
+def test_job_offered_requires_order_within_one_to_five(schema, validator):
+    # The JSON Schema layer bounds `order` to 1-5 per item; the fixed order-per-position
+    # mapping within an OA's group of 5 is enforced at the code layer (see
+    # local-hub/src/opshub_hub/models.py JobOfferedPayload.validate_ordered_test_cases and
+    # local-hub/tests/test_models.py::test_job_offered_with_wrong_order_at_position_is_rejected),
+    # since JSON Schema alone cannot express "grouped by oaOrder, order 1-5 within each group".
     payload = deepcopy(job_offered_envelope())
-    payload["payload"]["testCases"][0]["order"] = 2
+    payload["payload"]["testCases"][0]["order"] = 6
 
     assert list(validator(schema).iter_errors(payload))
+
+
+def test_job_offered_allows_multiple_oa_groups_of_five(schema, validator):
+    payload = deepcopy(job_offered_envelope())
+    second_group = deepcopy(payload["payload"]["testCases"])
+    for index, case in enumerate(second_group):
+        case["testCaseId"] = f"00000000-0000-4000-8000-00000000010{index}"
+        case["oaOrder"] = 2
+        case["oaName"] = "Other Business"
+    payload["payload"]["testCases"].extend(second_group)
+
+    assert not list(validator(schema).iter_errors(payload))
 
 
 def test_job_offered_requires_the_fixed_template_set(schema, validator):

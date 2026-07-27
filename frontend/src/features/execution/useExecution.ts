@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { apiClient } from "../../api/client";
-import type { ExecutionResponse } from "../../api/generated";
+import type { ExecutionResponse, ExecutionStatus } from "../../api/generated";
 
 export function executionQueryKey(operationId: string): readonly ["execution", string] {
   return ["execution", operationId] as const;
@@ -12,24 +12,24 @@ export function executionQueryKey(operationId: string): readonly ["execution", s
  * status endpoint - so both the WebSocket close handler's invalidateQueries call and
  * the 3s poll fallback in useExecutionChannel genuinely pull fresh state, instead of
  * the previous always-rejecting/disabled queryFn that made the fallback a no-op.
+ *
+ * Returns the *full* ExecutionStatus, including `results` (C2 fix): the previous
+ * version discarded `results` when mapping into the narrower ExecutionResponse shape,
+ * which meant the REST-poll fallback path never had any data to hydrate the table
+ * with - every test case stayed PENDING forever whenever the (nonexistent) browser
+ * WebSocket endpoint failed to connect. ExecuteScreen now dispatches a "hydrate"
+ * action off this query's `results` on every successful fetch.
  */
-export function useExecutionQuery(operationId: string): UseQueryResult<ExecutionResponse> {
+export function useExecutionQuery(operationId: string): UseQueryResult<ExecutionStatus> {
   const queryClient = useQueryClient();
   return useQuery({
     queryKey: executionQueryKey(operationId),
     queryFn: async () => {
-      const seeded = queryClient.getQueryData<ExecutionResponse>(executionQueryKey(operationId));
+      const seeded = queryClient.getQueryData<ExecutionResponse | ExecutionStatus>(executionQueryKey(operationId));
       if (!seeded) {
         throw new Error("no execution has been started yet");
       }
-      const status = await apiClient.getExecution(seeded.id);
-      return {
-        id: status.id,
-        operationId: status.operationId,
-        planId: status.planId,
-        sourceRevision: status.sourceRevision,
-        status: status.status,
-      } satisfies ExecutionResponse;
+      return apiClient.getExecution(seeded.id);
     },
     // enabled (not the previous permanently-disabled query): a query with enabled:false is
     // skipped by invalidateQueries too, which is exactly what made the 3s REST-fallback poll

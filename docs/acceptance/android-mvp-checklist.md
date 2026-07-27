@@ -22,7 +22,7 @@ case reruns are out of scope for this MVP.
 | Sequential execution (one active job leased per Hub) | `MvpLifecycleIT`, `HubProtocolIT` | Implemented |
 | Continuation after an assertion failure | `MvpLifecycleIT`, `local-hub/tests/integration/test_backend_contract.py`, `local-hub/tests/test_runner.py` | Implemented |
 | Exactly one infrastructure retry | same as above | Implemented |
-| Evidence upload | `MvpLifecycleIT`, `EvidenceServiceTest` | Implemented |
+| Evidence upload | `MvpLifecycleIT`, `EvidenceServiceTest` | Implemented end-to-end (backend endpoint + upload client + `Runner._capture_and_upload_evidence`), and `build_runner` now wires real capture/reset implementations (`opshub_hub.appium_control.AdbScreenshotCapturer`/`AppiumSessionResetter`, via `adb exec-out screencap` and the Appium server's own `/sessions` HTTP API — see C3 fix). Neither implementation has been exercised against a live physical device/Appium server in this environment; verified only by the `build_runner` wiring regression test (`local-hub/tests/test_main.py`) and unit-level review. Real on-device verification remains a gap. |
 | Hub-facing WebSocket events | `MvpLifecycleIT`, `HubProtocolIT` | Implemented |
 | Browser-facing REST-poll fallback | `frontend/e2e/mvp-lifecycle.spec.ts` | Implemented, passing |
 | Local Hub ↔ backend wire-contract conformance (JSON Schema + exact field names) | `local-hub/tests/integration/test_backend_contract.py` | Implemented, passing |

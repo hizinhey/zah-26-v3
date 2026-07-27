@@ -1,0 +1,174 @@
+{
+  "messageId" : "7182cd0c-c2a7-4a45-aa5f-4336f648d242",
+  "version" : 1,
+  "type" : "JOB_OFFERED",
+  "timestamp" : "2026-07-27T05:56:22.157816Z",
+  "payload" : {
+    "executionId" : "e57ed566-4d1a-4fef-8b53-29d8dfec40b6",
+    "idempotencyKey" : "fixture-idempotency-key",
+    "revision" : 1,
+    "platform" : "ANDROID",
+    "testCases" : [ {
+      "testCaseId" : "6464eacc-ec57-4257-84de-e45be163338e",
+      "oaOrder" : 1,
+      "oaName" : "OA One",
+      "order" : 1,
+      "templateId" : "android-oa-delivery-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 1",
+        "thumbnailUrl" : "https://example.test/thumb-1.png",
+        "oaName" : "OA One",
+        "expectedRedirectDomain" : "business1.example.test",
+        "expectedRedirectUrl" : "https://business1.example.test/offer",
+        "expectedBody" : "Body 1",
+        "expectedHeader" : "Header 1"
+      }
+    }, {
+      "testCaseId" : "03294031-54bb-46f4-8bde-b5360c55a018",
+      "oaOrder" : 1,
+      "oaName" : "OA One",
+      "order" : 2,
+      "templateId" : "android-thumbnail-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 1",
+        "thumbnailUrl" : "https://example.test/thumb-1.png",
+        "oaName" : "OA One",
+        "expectedRedirectDomain" : "business1.example.test",
+        "expectedRedirectUrl" : "https://business1.example.test/offer",
+        "expectedBody" : "Body 1",
+        "expectedHeader" : "Header 1"
+      }
+    }, {
+      "testCaseId" : "f9ce79e1-494f-4919-bd24-2ccd6a4ccd75",
+      "oaOrder" : 1,
+      "oaName" : "OA One",
+      "order" : 3,
+      "templateId" : "android-content-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 1",
+        "thumbnailUrl" : "https://example.test/thumb-1.png",
+        "oaName" : "OA One",
+        "expectedRedirectDomain" : "business1.example.test",
+        "expectedRedirectUrl" : "https://business1.example.test/offer",
+        "expectedBody" : "Body 1",
+        "expectedHeader" : "Header 1"
+      }
+    }, {
+      "testCaseId" : "c84b38f0-2588-4c6e-a390-6000836ca7ec",
+      "oaOrder" : 1,
+      "oaName" : "OA One",
+      "order" : 4,
+      "templateId" : "android-button-text-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 1",
+        "thumbnailUrl" : "https://example.test/thumb-1.png",
+        "oaName" : "OA One",
+        "expectedRedirectDomain" : "business1.example.test",
+        "expectedRedirectUrl" : "https://business1.example.test/offer",
+        "expectedBody" : "Body 1",
+        "expectedHeader" : "Header 1"
+      }
+    }, {
+      "testCaseId" : "bedc9fe2-02de-430c-a01c-435c56564039",
+      "oaOrder" : 1,
+      "oaName" : "OA One",
+      "order" : 5,
+      "templateId" : "android-redirect-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 1",
+        "thumbnailUrl" : "https://example.test/thumb-1.png",
+        "oaName" : "OA One",
+        "expectedRedirectDomain" : "business1.example.test",
+        "expectedRedirectUrl" : "https://business1.example.test/offer",
+        "expectedBody" : "Body 1",
+        "expectedHeader" : "Header 1"
+      }
+    }, {
+      "testCaseId" : "a2e2a78b-6707-41dc-8a64-0c1535945400",
+      "oaOrder" : 2,
+      "oaName" : "OA Two",
+      "order" : 1,
+      "templateId" : "android-oa-delivery-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 2",
+        "thumbnailUrl" : "https://example.test/thumb-2.png",
+        "oaName" : "OA Two",
+        "expectedRedirectDomain" : "business2.example.test",
+        "expectedRedirectUrl" : "https://business2.example.test/offer",
+        "expectedBody" : "Body 2",
+        "expectedHeader" : "Header 2"
+      }
+    }, {
+      "testCaseId" : "ebd1922f-ae4c-480a-947e-817bedd9b1f2",
+      "oaOrder" : 2,
+      "oaName" : "OA Two",
+      "order" : 2,
+      "templateId" : "android-thumbnail-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 2",
+        "thumbnailUrl" : "https://example.test/thumb-2.png",
+        "oaName" : "OA Two",
+        "expectedRedirectDomain" : "business2.example.test",
+        "expectedRedirectUrl" : "https://business2.example.test/offer",
+        "expectedBody" : "Body 2",
+        "expectedHeader" : "Header 2"
+      }
+    }, {
+      "testCaseId" : "ae3eb2a2-37e6-49fe-b4a5-1c0c96afb5bc",
+      "oaOrder" : 2,
+      "oaName" : "OA Two",
+      "order" : 3,
+      "templateId" : "android-content-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 2",
+        "thumbnailUrl" : "https://example.test/thumb-2.png",
+        "oaName" : "OA Two",
+        "expectedRedirectDomain" : "business2.example.test",
+        "expectedRedirectUrl" : "https://business2.example.test/offer",
+        "expectedBody" : "Body 2",
+        "expectedHeader" : "Header 2"
+      }
+    }, {
+      "testCaseId" : "5bbddd1a-02ad-4dee-a71c-704bf2e5ee88",
+      "oaOrder" : 2,
+      "oaName" : "OA Two",
+      "order" : 4,
+      "templateId" : "android-button-text-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 2",
+        "thumbnailUrl" : "https://example.test/thumb-2.png",
+        "oaName" : "OA Two",
+        "expectedRedirectDomain" : "business2.example.test",
+        "expectedRedirectUrl" : "https://business2.example.test/offer",
+        "expectedBody" : "Body 2",
+        "expectedHeader" : "Header 2"
+      }
+    }, {
+      "testCaseId" : "97e14d06-8e82-4cbd-ba06-5cc8b705bf91",
+      "oaOrder" : 2,
+      "oaName" : "OA Two",
+      "order" : 5,
+      "templateId" : "android-redirect-v1",
+      "templateVersion" : 1,
+      "parameters" : {
+        "expectedButtonText" : "Open 2",
+        "thumbnailUrl" : "https://example.test/thumb-2.png",
+        "oaName" : "OA Two",
+        "expectedRedirectDomain" : "business2.example.test",
+        "expectedRedirectUrl" : "https://business2.example.test/offer",
+        "expectedBody" : "Body 2",
+        "expectedHeader" : "Header 2"
+      }
+    } ],
+    "leaseToken" : "e1608842-9c2a-4030-8d7f-367d0c31d517"
+  }
+}

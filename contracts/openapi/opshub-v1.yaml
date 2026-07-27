@@ -365,44 +365,32 @@ components:
     TestCase:
       type: object
       additionalProperties: false
-      required: [testCaseId, order, templateId, templateVersion, parameters]
+      required: [testCaseId, oaOrder, oaName, order, templateId, templateVersion, parameters]
       properties:
         testCaseId: { $ref: '#/components/schemas/Uuid' }
-        order: { type: integer, minimum: 1 }
-        templateId: { type: string, minLength: 1 }
+        oaOrder: { type: integer, minimum: 1 }
+        oaName: { type: string, minLength: 1 }
+        order: { type: integer, minimum: 1, maximum: 5 }
+        templateId:
+          type: string
+          enum:
+            - android-oa-delivery-v1
+            - android-thumbnail-v1
+            - android-content-v1
+            - android-button-text-v1
+            - android-redirect-v1
         templateVersion: { type: integer, minimum: 1 }
         parameters: { $ref: '#/components/schemas/TemplateParametersV1' }
     OrderedTestCases:
+      description: >-
+        N groups of exactly 5 test cases (one group per OA), grouped by oaOrder.
+        Within each group, order runs 1-5 with a fixed templateId per position -
+        see contracts/schemas/hub-envelope-v1.json and
+        local-hub/src/opshub_hub/models.py for the code-level grouping check
+        (not fully expressible in pure JSON Schema/OpenAPI across group boundaries).
       type: array
       minItems: 5
-      maxItems: 5
-      prefixItems:
-        - allOf:
-            - $ref: '#/components/schemas/TestCase'
-            - properties:
-                order: { const: 1 }
-                templateId: { const: android-oa-delivery-v1 }
-        - allOf:
-            - $ref: '#/components/schemas/TestCase'
-            - properties:
-                order: { const: 2 }
-                templateId: { const: android-thumbnail-v1 }
-        - allOf:
-            - $ref: '#/components/schemas/TestCase'
-            - properties:
-                order: { const: 3 }
-                templateId: { const: android-content-v1 }
-        - allOf:
-            - $ref: '#/components/schemas/TestCase'
-            - properties:
-                order: { const: 4 }
-                templateId: { const: android-button-text-v1 }
-        - allOf:
-            - $ref: '#/components/schemas/TestCase'
-            - properties:
-                order: { const: 5 }
-                templateId: { const: android-redirect-v1 }
-      items: false
+      items: { $ref: '#/components/schemas/TestCase' }
     JobOfferedPayload:
       type: object
       additionalProperties: false

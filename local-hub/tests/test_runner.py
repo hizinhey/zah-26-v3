@@ -33,6 +33,8 @@ def make_job() -> JobOfferedPayload:
     test_cases = [
         TestCase(
             testCaseId=uuid4(),
+            oaOrder=1,
+            oaName="Sample OA",
             order=index + 1,
             templateId=template_id,
             templateVersion=1,
@@ -107,6 +109,12 @@ INFRA_FAIL = ProcessResult(
     returncode=1,
     stdout="",
     stderr="Error: Could not create a new session. Appium unreachable at http://127.0.0.1:4723",
+)
+TIMEOUT_FAIL = ProcessResult(
+    returncode=-1,
+    stdout="",
+    stderr="\nTimed out after 30s waiting for the spec to finish.",
+    timed_out=True,
 )
 
 
@@ -207,6 +215,26 @@ def test_infrastructure_error_retries_only_once_even_if_retry_also_fails(tmp_pat
     assert summary.results[0].attempt == 2
     assert summary.results[0].status == TestResultStatus.ERROR
     assert summary.results[0].errorCategory == ErrorCategory.INFRASTRUCTURE
+
+
+def test_subprocess_timeout_is_classified_as_timeout_and_retries_once(tmp_path):
+    """I3 regression: a subprocess.TimeoutExpired (surfaced as ProcessResult(timed_out=True))
+    must retry exactly once, like an infrastructure error, and report ErrorCategory.TIMEOUT -
+    not fall through to ASSERTION (never retried)."""
+    job = make_job()
+    launcher = FakeLauncher([TIMEOUT_FAIL, PASS, PASS, PASS, PASS, PASS])
+    reset_calls = []
+    runner, outbox, transport = make_runner(
+        tmp_path, launcher, reset_session=lambda: reset_calls.append(True)
+    )
+
+    summary = runner.run(job)
+
+    first_case_attempts = [a for a in summary.attempts if a.test_case_id == job.testCases[0].testCaseId]
+    assert [a.attempt for a in first_case_attempts] == [1, 2]
+    assert reset_calls == [True]
+    assert summary.results[0].attempt == 2
+    assert summary.results[0].status == TestResultStatus.PASSED
 
 
 def test_per_attempt_logs_are_written(tmp_path):
