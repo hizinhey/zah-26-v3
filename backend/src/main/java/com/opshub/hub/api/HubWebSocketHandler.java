@@ -59,6 +59,11 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
             case HubEnvelopeV1.TYPE_HEARTBEAT -> {
                 HubPayloads.HeartbeatPayload payload = objectMapper.convertValue(envelope.payload(), HubPayloads.HeartbeatPayload.class);
                 hubConnectionService.heartbeat(hubId, "WEBSOCKET", payload.deviceReady(), payload.runnerReady());
+                // A heartbeat renews whichever lease the Hub currently holds, so a long-running job
+                // survives past the fixed 60s lease window without the Hub separately tracking and
+                // resending the lease token (looked up server-side by hub ID - see
+                // ExecutionService#renewActiveLease). No-op when the Hub has no active lease.
+                executionService.renewActiveLease(hubId);
                 offerNextJobIfAny(hubId, session);
             }
             case HubEnvelopeV1.TYPE_JOB_PROGRESS -> executionService.recordProgress(envelope);

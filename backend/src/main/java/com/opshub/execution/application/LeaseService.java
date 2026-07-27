@@ -30,7 +30,17 @@ public class LeaseService {
         return count != null && count > 0;
     }
 
+    /**
+     * Grants a new lease for the Hub. Any of the Hub's previously expired leases are deleted first
+     * so that at most one row per {@code hub_id} ever exists in {@code job_leases}, which lets a
+     * database-level unique constraint on {@code hub_id} (see V3__job_leases_hub_id_unique.sql)
+     * enforce "one active lease per Hub" even across multiple backend instances - the in-process
+     * {@code ReentrantLock} in {@link ExecutionService#offerNextJob} only protects a single JVM.
+     * If a competing instance wins the race, the INSERT below fails with a unique-violation, which
+     * callers should treat the same as "nothing to offer right now".
+     */
     public UUID acquire(UUID hubId, UUID executionId) {
+        jdbcTemplate.update("DELETE FROM job_leases WHERE hub_id = ? AND expires_at <= ?", hubId, Instant.now());
         UUID leaseToken = UUID.randomUUID();
         jdbcTemplate.update("""
                         INSERT INTO job_leases (id, hub_id, execution_id, lease_token, expires_at)
@@ -49,6 +59,19 @@ public class LeaseService {
                         SET expires_at = ?
                         WHERE lease_token = ? AND hub_id = ? AND expires_at > ?
                         """, Instant.now().plus(LEASE_DURATION), leaseToken, hubId, Instant.now());
+        return updated == 1;
+    }
+
+    /**
+     * Renews whichever lease is currently active for the Hub, looked up by {@code hub_id} rather
+     * than requiring the caller to supply the lease token. Used for heartbeat-driven renewal.
+     */
+    public boolean renewActiveLease(UUID hubId) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE job_leases
+                        SET expires_at = ?
+                        WHERE hub_id = ? AND expires_at > ?
+                        """, Instant.now().plus(LEASE_DURATION), hubId, Instant.now());
         return updated == 1;
     }
 

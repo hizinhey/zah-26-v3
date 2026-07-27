@@ -121,13 +121,20 @@ public class ExecutionService {
                 return Optional.empty();
             }
             UUID executionId = candidate.get();
-            leaseService.acquire(hubId, executionId);
+            UUID leaseToken;
+            try {
+                leaseToken = leaseService.acquire(hubId, executionId);
+            } catch (org.springframework.dao.DataIntegrityViolationException lostRace) {
+                // Another backend instance won the race to lease this Hub first (enforced by the
+                // job_leases_hub_id_unique DB constraint) - nothing to offer from this instance.
+                return Optional.empty();
+            }
             jdbcTemplate.update("""
                             UPDATE executions
                             SET status = 'RUNNING', hub_id = ?, started_at = COALESCE(started_at, ?)
                             WHERE id = ?
                             """, hubId, Instant.now(), executionId);
-            return Optional.of(buildJobOfferedEnvelope(executionId));
+            return Optional.of(buildJobOfferedEnvelope(executionId, leaseToken));
         } finally {
             lock.unlock();
         }
@@ -136,6 +143,19 @@ public class ExecutionService {
     public boolean renewLease(UUID hubId, UUID leaseToken) {
         requireHubOnline(hubId);
         return leaseService.renew(hubId, leaseToken);
+    }
+
+    /**
+     * Renews whichever lease is currently active for the Hub, without requiring the Hub to echo
+     * the lease token back. Used by heartbeat handling on both transports so a Hub only needs to
+     * keep sending heartbeats (already required to stay ONLINE) to keep a long-running job's lease
+     * alive - it does not need to separately track and resend the lease token on every heartbeat.
+     * Returns {@code true} when a lease was found and renewed, {@code false} when the Hub has no
+     * active lease (nothing to renew - not an error).
+     */
+    public boolean renewActiveLease(UUID hubId) {
+        requireHubOnline(hubId);
+        return leaseService.renewActiveLease(hubId);
     }
 
     /**
@@ -185,6 +205,10 @@ public class ExecutionService {
                             UPDATE executions SET status = 'COMPLETED', finished_at = ? WHERE id = ?
                             """, Instant.now(), executionId);
             leaseService.release(executionId);
+            // Bound the lifetime of the monotonic-delivery tracker to the execution: once every
+            // test case has reached a terminal outcome there is nothing left to reorder-check, and
+            // holding the entry forever would leak memory for every execution that ever ran.
+            lastMessageTimestamps.remove(executionId);
         }
     }
 
@@ -204,7 +228,7 @@ public class ExecutionService {
         }
     }
 
-    private HubEnvelopeV1 buildJobOfferedEnvelope(UUID executionId) {
+    private HubEnvelopeV1 buildJobOfferedEnvelope(UUID executionId, UUID leaseToken) {
         ExecutionRow execution = jdbcTemplate.query("""
                         SELECT id, plan_id, source_revision, idempotency_key FROM executions WHERE id = ?
                         """, rs -> rs.next()
@@ -226,7 +250,7 @@ public class ExecutionService {
                 }, execution.planId());
 
         HubPayloads.JobOfferedPayload payload = new HubPayloads.JobOfferedPayload(
-                executionId, execution.idempotencyKey(), execution.sourceRevision(), "ANDROID", testCases);
+                executionId, execution.idempotencyKey(), execution.sourceRevision(), "ANDROID", testCases, leaseToken);
         return HubEnvelopeV1.of(HubEnvelopeV1.TYPE_JOB_OFFERED, payload);
     }
 

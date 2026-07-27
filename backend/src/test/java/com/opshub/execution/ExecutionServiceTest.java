@@ -92,7 +92,7 @@ class ExecutionServiceTest {
     }
 
     @Test
-    void leasesExactlyOneActiveJobPerHubAndRenewsOnHeartbeat() {
+    void leasesExactlyOneActiveJobPerHub() {
         UUID operationId = createDraftOperation("MOB-604");
         approvePlan(operationId, 1);
         executionService.start(operationId, 1, "key-lease");
@@ -104,14 +104,51 @@ class ExecutionServiceTest {
         assertThat(firstOffer.get().type()).isEqualTo(HubEnvelopeV1.TYPE_JOB_OFFERED);
         HubPayloads.JobOfferedPayload payload = (HubPayloads.JobOfferedPayload) firstOffer.get().payload();
         assertThat(payload.testCases()).hasSize(5);
+        assertThat(payload.leaseToken()).isNotNull();
 
         Optional<HubEnvelopeV1> secondOffer = executionService.offerNextJob(hubId);
         assertThat(secondOffer).isEmpty();
+    }
 
-        UUID leaseToken = jdbcTemplate.queryForObject(
-                "SELECT lease_token FROM job_leases WHERE hub_id = ?", UUID.class, hubId);
-        boolean renewed = executionService.renewLease(hubId, leaseToken);
+    /**
+     * Regression coverage for a review finding on the first cut of this test: it queried
+     * {@code lease_token} straight out of the DB and called {@code executionService.renewLease(...)}
+     * directly, which proved the CAS-renewal SQL works but never exercised the actual heartbeat
+     * path a real Hub uses. Real end-to-end coverage - heartbeat over both the WebSocket and HTTPS
+     * polling transports actually extending the lease's expiry - lives in
+     * {@code com.opshub.hub.HubProtocolIT}, which drives the real
+     * {@code HubWebSocketHandler}/{@code HubPollingController} endpoints. This test instead proves
+     * the lease-token-free, hub-ID-keyed renewal entry point those handlers call
+     * ({@link ExecutionService#renewActiveLease}) is itself correct.
+     */
+    @Test
+    void renewActiveLeaseExtendsTheHubsCurrentLeaseWithoutNeedingTheToken() {
+        UUID operationId = createDraftOperation("MOB-606");
+        approvePlan(operationId, 1);
+        executionService.start(operationId, 1, "key-renew-active");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+        assertThat(offer).isPresent();
+
+        Instant expiresBefore = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM job_leases WHERE hub_id = ?", Instant.class, hubId);
+
+        boolean renewed = executionService.renewActiveLease(hubId);
         assertThat(renewed).isTrue();
+
+        Instant expiresAfter = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM job_leases WHERE hub_id = ?", Instant.class, hubId);
+        assertThat(expiresAfter).isAfter(expiresBefore);
+    }
+
+    @Test
+    void renewActiveLeaseIsANoOpWhenTheHubHasNoLease() {
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+
+        assertThat(executionService.renewActiveLease(hubId)).isFalse();
     }
 
     @Test

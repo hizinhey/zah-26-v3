@@ -72,6 +72,10 @@ public class HubPollingController {
         var payload = new com.fasterxml.jackson.databind.ObjectMapper()
                 .convertValue(envelope.payload(), com.opshub.hub.domain.HubPayloads.HeartbeatPayload.class);
         hubConnectionService.heartbeat(hubId, "HTTPS_POLLING", payload.deviceReady(), payload.runnerReady());
+        // Same lease-renewal-on-heartbeat behavior as the WebSocket transport (see
+        // HubWebSocketHandler#handleTextMessage) - looked up server-side by hub ID rather than
+        // requiring the payload to carry the lease token.
+        executionService.renewActiveLease(hubId);
         return ResponseEntity.ok().build();
     }
 

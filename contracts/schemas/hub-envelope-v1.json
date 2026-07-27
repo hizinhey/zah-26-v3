@@ -124,13 +124,14 @@
     "JobOfferedPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["executionId", "idempotencyKey", "revision", "platform", "testCases"],
+      "required": ["executionId", "idempotencyKey", "revision", "platform", "testCases", "leaseToken"],
       "properties": {
         "executionId": { "$ref": "#/$defs/Uuid" },
         "idempotencyKey": { "type": "string", "minLength": 1 },
         "revision": { "$ref": "#/$defs/Revision" },
         "platform": { "const": "ANDROID" },
-        "testCases": { "$ref": "#/$defs/OrderedTestCases" }
+        "testCases": { "$ref": "#/$defs/OrderedTestCases" },
+        "leaseToken": { "$ref": "#/$defs/Uuid" }
       }
     },
     "JobProgressPayload": {

@@ -24,7 +24,8 @@ public final class HubPayloads {
             String idempotencyKey,
             int revision,
             String platform,
-            List<TestCase> testCases
+            List<TestCase> testCases,
+            UUID leaseToken
     ) {
     }
 

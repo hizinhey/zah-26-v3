@@ -98,6 +98,79 @@ class HubProtocolIT {
     }
 
     @Test
+    void pollingHeartbeatRenewsTheHubsActiveLease() throws Exception {
+        UUID operationId = createApprovedOperation("MOB-802");
+        executionService.start(operationId, 1, "poll-heartbeat-key-" + UUID.randomUUID());
+        UUID hubId = UUID.randomUUID();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Hub-Token", TOKEN);
+        ResponseEntity<HubEnvelopeV1> offerResponse = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(headers), HubEnvelopeV1.class, port, hubId);
+        assertThat(offerResponse.getStatusCode().value()).isEqualTo(200);
+
+        java.time.Instant expiresBefore = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM job_leases WHERE hub_id = ?", java.time.Instant.class, hubId);
+
+        Thread.sleep(50);
+        HubEnvelopeV1 heartbeat = HubEnvelopeV1.of(HubEnvelopeV1.TYPE_HEARTBEAT,
+                new HubPayloads.HeartbeatPayload(true, true));
+        ResponseEntity<Void> heartbeatResponse = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/heartbeat",
+                HttpMethod.POST, new HttpEntity<>(heartbeat, headers), Void.class, port, hubId);
+        assertThat(heartbeatResponse.getStatusCode().value()).isEqualTo(200);
+
+        java.time.Instant expiresAfter = jdbcTemplate.queryForObject(
+                "SELECT expires_at FROM job_leases WHERE hub_id = ?", java.time.Instant.class, hubId);
+        assertThat(expiresAfter).isAfter(expiresBefore);
+    }
+
+    @Test
+    void webSocketHeartbeatRenewsTheHubsActiveLease() throws Exception {
+        UUID operationId = createApprovedOperation("MOB-803");
+        executionService.start(operationId, 1, "ws-heartbeat-key-" + UUID.randomUUID());
+        UUID hubId = UUID.randomUUID();
+
+        LinkedBlockingQueue<String> received = new LinkedBlockingQueue<>();
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession session = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                received.add(message.getPayload());
+            }
+        }, "ws://localhost:{port}/ws/v1/hubs/{hubId}?token={token}", port, hubId, TOKEN).get(5, TimeUnit.SECONDS);
+
+        try {
+            // First heartbeat triggers the job offer (see webSocketDeliversTheSameJobOfferedEnvelopeShapeAsPolling).
+            HubEnvelopeV1 firstHeartbeat = HubEnvelopeV1.of(HubEnvelopeV1.TYPE_HEARTBEAT,
+                    new HubPayloads.HeartbeatPayload(true, true));
+            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(firstHeartbeat)));
+            String raw = received.poll(5, TimeUnit.SECONDS);
+            assertThat(raw).isNotNull();
+            HubEnvelopeV1 offer = objectMapper.readValue(raw, HubEnvelopeV1.class);
+            assertThat(offer.type()).isEqualTo(HubEnvelopeV1.TYPE_JOB_OFFERED);
+
+            java.time.Instant expiresBefore = jdbcTemplate.queryForObject(
+                    "SELECT expires_at FROM job_leases WHERE hub_id = ?", java.time.Instant.class, hubId);
+
+            Thread.sleep(50);
+            HubEnvelopeV1 secondHeartbeat = HubEnvelopeV1.of(HubEnvelopeV1.TYPE_HEARTBEAT,
+                    new HubPayloads.HeartbeatPayload(true, true));
+            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(secondHeartbeat)));
+            // No further offer is expected (only one active job to lease) - give the server a
+            // moment to process the heartbeat before asserting on the DB state.
+            Thread.sleep(500);
+
+            java.time.Instant expiresAfter = jdbcTemplate.queryForObject(
+                    "SELECT expires_at FROM job_leases WHERE hub_id = ?", java.time.Instant.class, hubId);
+            assertThat(expiresAfter).isAfter(expiresBefore);
+        } finally {
+            session.close();
+        }
+    }
+
+    @Test
     void pollingRejectsAnInvalidHubToken() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Hub-Token", "wrong-token");
