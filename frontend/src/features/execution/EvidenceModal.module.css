@@ -42,7 +42,7 @@
 }
 
 .status {
-  color: var(--ops-color-gray-600);
+  color: var(--ops-color-gray-500);
 }
 
 .items {
@@ -59,7 +59,7 @@
 
 .itemMeta {
   font-size: var(--ops-font-size-sm);
-  color: var(--ops-color-gray-600);
+  color: var(--ops-color-gray-500);
   margin: 0 0 var(--ops-space-2);
 }
 

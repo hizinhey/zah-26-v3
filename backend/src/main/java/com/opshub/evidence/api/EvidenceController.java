@@ -1,5 +1,6 @@
 package com.opshub.evidence.api;
 
+import com.opshub.evidence.application.EvidenceNotFoundException;
 import com.opshub.evidence.application.EvidenceService;
 import com.opshub.evidence.application.EvidenceValidationException;
 import com.opshub.hub.application.HubTokenValidator;
@@ -23,10 +24,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Hub-facing evidence upload endpoint - requires the same {@code X-Hub-Token} shared-secret
- * check every other Hub-facing endpoint enforces ({@link com.opshub.hub.api.HubPollingController},
- * {@link com.opshub.hub.api.HubWebSocketConfig}). Without this (I1), Nginx exposing all of
- * {@code /api/} publicly made this an unauthenticated disk-fill vector.
+ * Evidence endpoints for one test result. The {@code POST} upload is Hub-facing and requires
+ * the same {@code X-Hub-Token} shared-secret check every other Hub-facing endpoint enforces
+ * ({@link com.opshub.hub.api.HubPollingController}, {@link com.opshub.hub.api.HubWebSocketConfig}).
+ * Without this (I1), Nginx exposing all of {@code /api/} publicly made this an unauthenticated
+ * disk-fill vector. The {@code GET} list is browser-facing and unauthenticated, matching every
+ * other browser-facing read (operations, plans, executions).
  */
 @RestController
 @RequestMapping("/api/v1/test-results/{testResultId}/evidence")
@@ -91,7 +94,7 @@ class EvidenceErrorHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
-    @ExceptionHandler(com.opshub.evidence.application.EvidenceNotFoundException.class)
+    @ExceptionHandler(EvidenceNotFoundException.class)
     ResponseEntity<Void> notFound() {
         return ResponseEntity.notFound().build();
     }
