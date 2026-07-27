@@ -97,13 +97,18 @@ describe("InputScreen", () => {
     expect(screen.getByLabelText(/Button Text/)).toHaveValue("First");
   });
 
-  it("only ever displays Android as the platform, matching the backend's ANDROID-only contract", () => {
+  it("offers all four platforms and defaults new OAs to Android", async () => {
+    const user = userEvent.setup();
     renderScreen("/operations/new/input");
 
-    expect(screen.getByTestId("oa-platform")).toHaveTextContent("Android");
-    expect(screen.queryByText("iOS")).not.toBeInTheDocument();
-    expect(screen.queryByText("Web")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "iOS" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Android" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "iOS" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "PC" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Web" })).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(screen.getByRole("button", { name: "iOS" }));
+    expect(screen.getByRole("button", { name: "iOS" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Android" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("disables AI Validation until Jira ID and every required OA field is filled, and explains why", async () => {

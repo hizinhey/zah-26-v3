@@ -203,7 +203,12 @@ export function ExecuteScreen(): ReactElement {
               {isComplete ? "Execution Summary" : `Current Run: OA #${currentOaOrder ?? "-"} — Android`}
             </h2>
             <DisabledReason reason={startDisabledReason}>
-              <button type="button" onClick={handleStart} disabled={startExecution.isPending}>
+              <button
+                type="button"
+                className="ops-primary-button"
+                onClick={handleStart}
+                disabled={startExecution.isPending}
+              >
                 {startExecution.isPending ? "Starting…" : "Start Execution"}
               </button>
             </DisabledReason>

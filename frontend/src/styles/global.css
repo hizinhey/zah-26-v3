@@ -27,6 +27,60 @@ button {
   font-family: inherit;
 }
 
+.ops-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ops-space-2);
+  min-height: var(--ops-min-target-size);
+  padding: var(--ops-space-3) var(--ops-space-6);
+  border: none;
+  border-radius: var(--ops-radius-md);
+  background-color: var(--ops-color-blue-500);
+  color: var(--ops-color-white);
+  font-size: var(--ops-font-size-md);
+  font-weight: var(--ops-font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ops-primary-button:hover:not(:disabled) {
+  background-color: var(--ops-color-blue-600);
+}
+
+.ops-primary-button:disabled {
+  background-color: var(--ops-color-gray-200);
+  color: var(--ops-color-gray-500);
+  cursor: not-allowed;
+}
+
+.ops-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ops-space-2);
+  min-height: var(--ops-min-target-size);
+  padding: var(--ops-space-2) var(--ops-space-4);
+  border: 1px solid var(--ops-color-blue-500);
+  border-radius: var(--ops-radius-md);
+  background-color: var(--ops-color-white);
+  color: var(--ops-color-blue-600);
+  font-size: var(--ops-font-size-md);
+  font-weight: var(--ops-font-weight-medium);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ops-secondary-button:hover:not(:disabled) {
+  background-color: var(--ops-color-blue-50);
+}
+
+.ops-secondary-button:disabled {
+  border-color: var(--ops-color-gray-300);
+  color: var(--ops-color-gray-500);
+  cursor: not-allowed;
+}
+
 /* Visible focus for keyboard users on any interactive element */
 :focus-visible {
   outline: none;

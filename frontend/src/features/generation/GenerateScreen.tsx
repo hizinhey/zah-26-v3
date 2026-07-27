@@ -165,7 +165,12 @@ export function GenerateScreen(): ReactElement {
 
       <div className={styles.actions}>
         <DisabledReason reason={confirmDisabledReason}>
-          <button type="button" onClick={handleConfirm} disabled={approvePlan.isPending}>
+          <button
+            type="button"
+            className="ops-primary-button"
+            onClick={handleConfirm}
+            disabled={approvePlan.isPending}
+          >
             Confirm
           </button>
         </DisabledReason>

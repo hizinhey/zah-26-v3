@@ -308,7 +308,12 @@ export function InputScreen(): ReactElement {
 
       <div className={styles.actions}>
         <DisabledReason reason={submitDisabledReason}>
-          <button type="button" onClick={handleSubmit} disabled={isSubmitting}>
+          <button
+            type="button"
+            className="ops-primary-button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+          >
             {isSubmitting ? "Validating…" : "AI Validation"}
           </button>
         </DisabledReason>

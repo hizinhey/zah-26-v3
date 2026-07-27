@@ -142,7 +142,7 @@ class ValidationGatingIT {
     private static HttpServer startGeminiServer() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/v1beta/models/gemini-2.5-flash-lite:generateContent", ValidationGatingIT::geminiResponse);
+            server.createContext("/v1beta/models/gemma-4-31b-it:generateContent", ValidationGatingIT::geminiResponse);
             server.start();
             return server;
         } catch (IOException exception) {

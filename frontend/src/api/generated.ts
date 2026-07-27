@@ -41,8 +41,10 @@ export interface CreateOperationRequest {
   jiraId: string;
 }
 
+export type Platform = "ANDROID" | "IOS" | "PC" | "WEB";
+
 export interface OfficialAccountInput {
-  platform: "ANDROID";
+  platform: Platform;
   oaName: string;
   thumbnailUrl: string;
   content: string;

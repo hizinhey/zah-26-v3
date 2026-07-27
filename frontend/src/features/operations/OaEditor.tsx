@@ -1,11 +1,21 @@
 import type { ReactElement } from "react";
-import type { OfficialAccountInput } from "../../api/generated";
+import type { OfficialAccountInput, Platform } from "../../api/generated";
 import { ContentPreview } from "./ContentPreview";
 import styles from "./OaEditor.module.css";
 
 const CONTENT_MAX_LENGTH = 500;
 
-export type EditableOaField = "thumbnailUrl" | "content" | "buttonText" | "redirectUrl";
+export type EditableOaField = "platform" | "thumbnailUrl" | "content" | "buttonText" | "redirectUrl";
+
+// Only ANDROID is generated/validated/executed end-to-end today (backend rejects any other
+// platform when saving OAs). The other three are offered here to match the mockup's platform
+// selector; picking one will surface a normal validation/save error until they're implemented.
+const PLATFORMS: { value: Platform; label: string }[] = [
+  { value: "ANDROID", label: "Android" },
+  { value: "IOS", label: "iOS" },
+  { value: "PC", label: "PC" },
+  { value: "WEB", label: "Web" },
+];
 
 export interface OaEditorProps {
   oa: OfficialAccountInput;
@@ -30,12 +40,21 @@ export function OaEditor({ oa, onFieldChange }: OaEditorProps): ReactElement {
       <div className={styles.field}>
         <label className={styles.fieldLabelWrapper}>
           <FieldLabel number={1} text="Platform" />
-          {/* Only ANDROID is a valid platform per OfficialAccountInput (contracts/openapi/opshub-v1.yaml);
-              this MVP does not offer a selector, it states the fixed platform. */}
-          <span className={styles.platformBadge} data-testid="oa-platform">
-            Android
-          </span>
         </label>
+        <div className={styles.platformGroup} role="group" aria-label="Platform" data-testid="oa-platform">
+          {PLATFORMS.map((platform) => (
+            <button
+              key={platform.value}
+              type="button"
+              className={styles.platformOption}
+              aria-pressed={oa.platform === platform.value}
+              data-selected={oa.platform === platform.value || undefined}
+              onClick={() => onFieldChange("platform", platform.value)}
+            >
+              {platform.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className={styles.field}>

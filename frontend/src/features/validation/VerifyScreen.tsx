@@ -169,7 +169,10 @@ export function VerifyScreen(): ReactElement {
         <Card title="OA Summary">
           {rows.length === 0 ? (
             <p className={styles.empty}>
-              No validation results yet. <button type="button" onClick={handleRecheck}>Re-check</button>
+              No validation results yet.{" "}
+              <button type="button" className={styles.recheckButton} onClick={handleRecheck}>
+                Re-check
+              </button>
             </p>
           ) : (
             <table className={styles.table}>
@@ -233,7 +236,7 @@ export function VerifyScreen(): ReactElement {
 
       <div className={styles.actions}>
         <DisabledReason reason={generateDisabledReason}>
-          <button type="button" onClick={handleGenerate}>
+          <button type="button" className="ops-primary-button" onClick={handleGenerate}>
             Generate
           </button>
         </DisabledReason>

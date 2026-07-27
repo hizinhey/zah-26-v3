@@ -42,7 +42,7 @@ public class GeminiTextValidationAdapter implements TextValidationPort {
     public GeminiTextValidationAdapter(
             @Value("${opshub.validation.gemini.base-url:https://generativelanguage.googleapis.com}") String baseUrl,
             @Value("${GEMINI_API_KEY:}") String apiKey,
-            @Value("${GEMINI_MODEL:gemini-2.5-flash-lite}") String model,
+            @Value("${GEMINI_MODEL:gemma-4-31b-it}") String model,
             @Value("${opshub.validation.gemini.request-timeout:5s}") Duration requestTimeout
     ) {
         this(HttpClient.newBuilder().connectTimeout(requestTimeout).build(), new ObjectMapper(), baseUrl, apiKey, model, requestTimeout);
@@ -60,7 +60,7 @@ public class GeminiTextValidationAdapter implements TextValidationPort {
         this.objectMapper = objectMapper;
         this.baseUrl = stripTrailingSlash(baseUrl);
         this.apiKey = apiKey == null ? "" : apiKey;
-        this.model = model == null || model.isBlank() ? "gemini-2.5-flash-lite" : model;
+        this.model = model == null || model.isBlank() ? "gemma-4-31b-it" : model;
         this.requestTimeout = requestTimeout;
     }
 

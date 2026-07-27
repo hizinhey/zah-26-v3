@@ -37,17 +37,30 @@
   font-weight: var(--ops-font-weight-semibold);
 }
 
-.platformBadge {
+.platformGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ops-space-2);
+}
+
+.platformOption {
   display: inline-flex;
   align-items: center;
   gap: var(--ops-space-2);
-  width: fit-content;
   padding: var(--ops-space-2) var(--ops-space-4);
-  border: 1px solid var(--ops-color-blue-500);
+  min-height: var(--ops-min-target-size);
+  border: 1px solid var(--ops-color-gray-300);
   border-radius: var(--ops-radius-md);
+  background: var(--ops-color-white);
+  color: var(--ops-color-gray-700);
+  font-weight: var(--ops-font-weight-medium);
+  cursor: pointer;
+}
+
+.platformOption[data-selected] {
+  border-color: var(--ops-color-blue-500);
   background: var(--ops-color-blue-50);
   color: var(--ops-color-blue-600);
-  font-weight: var(--ops-font-weight-medium);
 }
 
 .input,
