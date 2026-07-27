@@ -28,6 +28,12 @@ opshub:
       node-executable: ${OPSHUB_NODE_EXECUTABLE:}
       tsc-entry: ${OPSHUB_TSC_ENTRY:}
       compiler-timeout: ${OPSHUB_TSC_TIMEOUT:30s}
+  hub:
+    shared-token: ${OPSHUB_HUB_TOKEN:dev-hub-token}
+    poll-wait-cap-seconds: ${OPSHUB_HUB_POLL_WAIT_CAP_SECONDS:25}
+  evidence:
+    root: ${OPSHUB_EVIDENCE_ROOT:evidence}
+    max-bytes: ${OPSHUB_EVIDENCE_MAX_BYTES:10485760}
 server:
   error:
     include-message: never
