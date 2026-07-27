@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,15 +30,19 @@ public class TestPlanService {
     private final JdbcTemplate jdbcTemplate;
     private final ContentParser contentParser;
     private final ObjectMapper objectMapper;
+    private final TemplateReadinessValidator templateReadinessValidator;
 
-    public TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser) {
-        this(entityManager, jdbcTemplate, contentParser, new ObjectMapper());
+    public TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser,
+                           TemplateReadinessValidator templateReadinessValidator) {
+        this(entityManager, jdbcTemplate, contentParser, templateReadinessValidator, new ObjectMapper());
     }
 
-    TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser, ObjectMapper objectMapper) {
+    TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser,
+                    TemplateReadinessValidator templateReadinessValidator, ObjectMapper objectMapper) {
         this.entityManager = entityManager;
         this.jdbcTemplate = jdbcTemplate;
         this.contentParser = contentParser;
+        this.templateReadinessValidator = templateReadinessValidator;
         this.objectMapper = objectMapper;
     }
 
@@ -50,10 +56,11 @@ public class TestPlanService {
 
         UUID planId = UUID.randomUUID();
         List<TestCaseDto> cases = createCases(operation, planId);
+        String planStatus = cases.stream().allMatch(testCase -> "READY".equals(testCase.status())) ? "READY" : "GENERATION_FAILED";
         jdbcTemplate.update("""
                         INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
-                        VALUES (?, ?, ?, ?, 'READY', 'PENDING')
-                        """, planId, operationId, revision, CATALOG_VERSION);
+                        VALUES (?, ?, ?, ?, ?, 'PENDING')
+                        """, planId, operationId, revision, CATALOG_VERSION, planStatus);
         for (TestCaseDto testCase : cases) {
             jdbcTemplate.update("""
                             INSERT INTO test_cases (id, plan_id, oa_order, case_order, template_id, template_version, template_sha256, parameters, status)
@@ -66,11 +73,11 @@ public class TestPlanService {
                         UPDATE operations
                         SET status = ?, plan_id = ?, approved_plan_id = null, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ? AND revision = ?
-                        """, OperationStatus.READY_FOR_APPROVAL.name(), planId, operationId, revision);
+                        """, "READY".equals(planStatus) ? OperationStatus.READY_FOR_APPROVAL.name() : OperationStatus.GENERATION_FAILED.name(), planId, operationId, revision);
         if (updated == 0) {
             throw new RevisionConflictException(currentRevision(operationId));
         }
-        return new TestPlanDto(planId, operationId, revision, CATALOG_VERSION, "READY", "PENDING", List.copyOf(cases));
+        return new TestPlanDto(planId, operationId, revision, CATALOG_VERSION, planStatus, "PENDING", List.copyOf(cases));
     }
 
     @Transactional
@@ -109,9 +116,16 @@ public class TestPlanService {
         for (OfficialAccount account : operation.getOfficialAccounts()) {
             TemplateParameters parameters = parametersFor(account);
             for (TemplateId template : TemplateId.values()) {
+                TemplateReadinessValidator.Readiness readiness;
+                try {
+                    readiness = templateReadinessValidator.validate(template, parameters);
+                } catch (RuntimeException exception) {
+                    readiness = TemplateReadinessValidator.Readiness.notReady("Template readiness validation failed");
+                }
                 cases.add(new TestCaseDto(
                         UUID.randomUUID(), planId, account.getOaOrder(), template.ordinal() + 1,
-                        template.id(), template.version(), template.sha256(), parameters, "READY"
+                        template.id(), template.version(), template.sha256(), parameters,
+                        readiness.ready() ? "READY" : "NOT_READY", readiness.reason()
                 ));
             }
         }
@@ -206,6 +220,17 @@ public class TestPlanService {
             String expectedRedirectUrl,
             String expectedRedirectDomain
     ) {
+        public Map<String, String> asMap() {
+            Map<String, String> values = new LinkedHashMap<>();
+            values.put("oaName", oaName);
+            values.put("thumbnailUrl", thumbnailUrl);
+            values.put("expectedHeader", expectedHeader);
+            values.put("expectedBody", expectedBody);
+            values.put("expectedButtonText", expectedButtonText);
+            values.put("expectedRedirectUrl", expectedRedirectUrl);
+            values.put("expectedRedirectDomain", expectedRedirectDomain);
+            return Map.copyOf(values);
+        }
     }
 
     public record TestCaseDto(
@@ -217,7 +242,8 @@ public class TestPlanService {
             int templateVersion,
             String templateSha256,
             TemplateParameters parameters,
-            String status
+            String status,
+            String readinessReason
     ) {
     }
 

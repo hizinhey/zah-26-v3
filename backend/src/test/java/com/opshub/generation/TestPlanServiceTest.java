@@ -1,6 +1,7 @@
 package com.opshub.generation;
 
 import com.opshub.generation.application.TestPlanService;
+import com.opshub.generation.application.TemplateReadinessValidator;
 import com.opshub.generation.domain.TemplateId;
 import com.opshub.operation.application.RevisionConflictException;
 import com.opshub.operation.domain.OfficialAccount;
@@ -33,7 +34,10 @@ class TestPlanServiceTest {
     @Test
     void generatesFiveFixedCasesForTheCurrentRevisionWithParsedParameters() {
         RecordingJdbcTemplate jdbcTemplate = new RecordingJdbcTemplate(1, 0);
-        TestPlanService service = new TestPlanService(entityManagerReturning(operation), jdbcTemplate, new ContentParser());
+        TestPlanService service = new TestPlanService(
+                entityManagerReturning(operation), jdbcTemplate, new ContentParser(),
+                TemplateReadinessValidator.alwaysReady()
+        );
 
         TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
         List<TestPlanService.TestCaseDto> cases = plan.cases();
@@ -53,6 +57,24 @@ class TestPlanServiceTest {
     }
 
     @Test
+    void keepsAPlanGenerationFailedWhenAnyRenderedTemplateIsNotReady() {
+        RecordingJdbcTemplate jdbcTemplate = new RecordingJdbcTemplate(1, 0);
+        TestPlanService service = new TestPlanService(
+                entityManagerReturning(operation), jdbcTemplate, new ContentParser(),
+                (template, parameters) -> template == TemplateId.CONTENT
+                        ? TemplateReadinessValidator.Readiness.notReady("TypeScript failed")
+                        : TemplateReadinessValidator.Readiness.readyResult()
+        );
+
+        TestPlanService.TestPlanDto plan = service.generate(operation.getId(), operation.getRevision());
+
+        assertThat(plan.status()).isEqualTo("GENERATION_FAILED");
+        assertThat(plan.cases()).extracting(TestPlanService.TestCaseDto::status)
+                .containsExactly("READY", "READY", "NOT_READY", "READY", "READY");
+        assertThat(plan.cases().get(2).readinessReason()).isEqualTo("TypeScript failed");
+    }
+
+    @Test
     void blocksApprovalWhenAnyCaseIsNotReady() {
         TestPlanService service = new TestPlanService(null, new RecordingJdbcTemplate(1, 0) {
             @Override
@@ -64,7 +86,7 @@ class TestPlanServiceTest {
             public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
                 return requiredType.cast(1);
             }
-        }, new ContentParser());
+        }, new ContentParser(), TemplateReadinessValidator.alwaysReady());
 
         assertThatThrownBy(() -> service.approve(UUID.randomUUID(), 1))
                 .isInstanceOf(IllegalStateException.class)
@@ -83,7 +105,7 @@ class TestPlanServiceTest {
             public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
                 return requiredType.cast(2);
             }
-        }, new ContentParser());
+        }, new ContentParser(), TemplateReadinessValidator.alwaysReady());
 
         assertThatThrownBy(() -> service.approve(UUID.randomUUID(), 1))
                 .isInstanceOfSatisfying(RevisionConflictException.class,

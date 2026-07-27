@@ -21,6 +21,12 @@ opshub:
       request-timeout: 3s
       max-bytes: 5242880
       max-redirects: 5
+  generation:
+    templates:
+      template-root: ${OPSHUB_TEMPLATE_ROOT:local-hub/templates/android}
+      node-executable: ${OPSHUB_NODE_EXECUTABLE:}
+      tsc-entry: ${OPSHUB_TSC_ENTRY:}
+      compiler-timeout: ${OPSHUB_TSC_TIMEOUT:30s}
 server:
   error:
     include-message: never
