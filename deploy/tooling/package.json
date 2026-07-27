@@ -1,0 +1,13 @@
+{
+  "name": "opshub-template-compiler-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned Node/TypeScript tooling used by the backend image to type-check rendered Android template test specs before marking a generated case READY.",
+  "dependencies": {
+    "typescript": "5.6.3",
+    "@types/node": "20.14.15",
+    "@wdio/globals": "9.29.1",
+    "@wdio/mocha-framework": "9.30.0",
+    "expect-webdriverio": "5.7.0"
+  }
+}

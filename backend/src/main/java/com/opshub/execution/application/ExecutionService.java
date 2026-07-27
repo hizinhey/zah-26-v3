@@ -6,6 +6,7 @@ import com.opshub.hub.domain.HubEnvelopeV1;
 import com.opshub.hub.domain.HubPayloads;
 import com.opshub.operation.application.OperationNotFoundException;
 import com.opshub.operation.application.RevisionConflictException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,7 @@ public class ExecutionService {
             rs.getObject("queued_at", Instant.class)
     );
 
+    @Autowired
     public ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService) {
         this(jdbcTemplate, leaseService, new ObjectMapper());
     }

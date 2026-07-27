@@ -1,41 +1,88 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-opshub}
       POSTGRES_USER: ${POSTGRES_USER:-opshub}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opshub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in deploy/env/backend.env}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${OPSHUB_POSTGRES_DIR:-/opt/opshub/postgres}:/var/lib/postgresql/data:Z
+    networks:
+      - opshub-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
     image: opshub-backend:latest
+    restart: unless-stopped
+    env_file:
+      - env/backend.env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-opshub}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-opshub}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-opshub}
+      OPSHUB_DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-opshub}
+      OPSHUB_DATABASE_USERNAME: ${POSTGRES_USER:-opshub}
+      OPSHUB_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in deploy/env/backend.env}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - evidence-data:/var/lib/opshub/evidence
+      - ${OPSHUB_DATA_DIR:-/opt/opshub/data}/evidence:/var/lib/opshub/evidence:Z
+    networks:
+      - opshub-internal
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
   frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
     image: opshub-frontend:latest
+    restart: unless-stopped
+    networks:
+      - opshub-internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   gateway:
     image: nginx:1.27-alpine
+    restart: unless-stopped
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ../gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../gateway/conf.d:/etc/nginx/conf.d:ro
+      - ${OPSHUB_TLS_DIR:-/opt/opshub/tls}:/etc/nginx/tls:ro
+    networks:
+      - opshub-internal
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-volumes:
-  postgres-data:
-  evidence-data:
+networks:
+  opshub-internal:
+    name: opshub-internal
+    driver: bridge

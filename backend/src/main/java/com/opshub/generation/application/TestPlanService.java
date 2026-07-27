@@ -10,6 +10,7 @@ import com.opshub.operation.domain.Operation;
 import com.opshub.operation.domain.OperationStatus;
 import com.opshub.validation.application.ContentParser;
 import jakarta.persistence.EntityManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class TestPlanService {
     private final ObjectMapper objectMapper;
     private final TemplateReadinessValidator templateReadinessValidator;
 
+    @Autowired
     public TestPlanService(EntityManager entityManager, JdbcTemplate jdbcTemplate, ContentParser contentParser,
                            TemplateReadinessValidator templateReadinessValidator) {
         this(entityManager, jdbcTemplate, contentParser, templateReadinessValidator, new ObjectMapper());
