@@ -6,6 +6,7 @@ import com.opshub.hub.application.HubTokenValidator;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -17,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -55,7 +58,21 @@ public class EvidenceController {
         }
     }
 
+    @GetMapping
+    public List<EvidenceItemResponse> list(@PathVariable UUID testResultId) {
+        return evidenceService.listForTestResult(testResultId).stream()
+                .map(EvidenceItemResponse::from)
+                .toList();
+    }
+
     public record EvidenceResponse(UUID id) {
+    }
+
+    public record EvidenceItemResponse(UUID id, String evidenceType, long sizeBytes, String checksum, Instant createdAt) {
+        static EvidenceItemResponse from(EvidenceService.EvidenceSummary summary) {
+            return new EvidenceItemResponse(summary.id(), summary.evidenceType(), summary.sizeBytes(),
+                    summary.checksum(), summary.createdAt());
+        }
     }
 
     static class InvalidHubTokenException extends RuntimeException {
@@ -72,6 +89,11 @@ class EvidenceErrorHandler {
     @ExceptionHandler(EvidenceController.InvalidHubTokenException.class)
     ResponseEntity<Void> invalidToken() {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    @ExceptionHandler(com.opshub.evidence.application.EvidenceNotFoundException.class)
+    ResponseEntity<Void> notFound() {
+        return ResponseEntity.notFound().build();
     }
 
     record ErrorResponse(String code, String message) {
