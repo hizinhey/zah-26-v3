@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Annotated, Literal, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
 
 
 class StrictModel(BaseModel):
@@ -65,6 +65,17 @@ class TestCase(StrictModel):
     parameters: TemplateParametersV1
 
 
+# Fixed order/templateId per position, mirroring $defs.OrderedTestCases'
+# prefixItems in contracts/schemas/hub-envelope-v1.json.
+ORDERED_TEST_CASE_TEMPLATE_IDS: tuple[str, ...] = (
+    "android-oa-delivery-v1",
+    "android-thumbnail-v1",
+    "android-content-v1",
+    "android-button-text-v1",
+    "android-redirect-v1",
+)
+
+
 class JobOfferedPayload(StrictModel):
     executionId: UUID
     idempotencyKey: str = Field(min_length=1)
@@ -72,6 +83,29 @@ class JobOfferedPayload(StrictModel):
     platform: Literal["ANDROID"]
     testCases: list[TestCase]
     leaseToken: UUID
+
+    @field_validator("testCases")
+    @classmethod
+    def validate_ordered_test_cases(cls, value: list[TestCase]) -> list[TestCase]:
+        expected_len = len(ORDERED_TEST_CASE_TEMPLATE_IDS)
+        if len(value) != expected_len:
+            raise ValueError(
+                f"testCases must contain exactly {expected_len} items, got {len(value)}"
+            )
+        for index, (test_case, expected_template_id) in enumerate(
+            zip(value, ORDERED_TEST_CASE_TEMPLATE_IDS)
+        ):
+            expected_order = index + 1
+            if test_case.order != expected_order:
+                raise ValueError(
+                    f"testCases[{index}].order must be {expected_order}, got {test_case.order}"
+                )
+            if test_case.templateId != expected_template_id:
+                raise ValueError(
+                    f"testCases[{index}].templateId must be '{expected_template_id}', "
+                    f"got '{test_case.templateId}'"
+                )
+        return value
 
 
 class JobProgressPayload(StrictModel):
