@@ -10,12 +10,13 @@ import threading
 import time
 
 from opshub_hub.appium_control import AdbScreenshotCapturer, AppiumSessionResetter
+from opshub_hub.browser_control import WebScreenshotCapturer, web_command_builder
 from opshub_hub.config import HubConfig, load_config
 from opshub_hub.evidence import HttpEvidenceUploader
 from opshub_hub.journal import ExecutionJournal
 from opshub_hub.models import JobOfferedPayload
 from opshub_hub.outbox import Outbox
-from opshub_hub.preflight import run_preflight
+from opshub_hub.preflight import run_preflight, run_web_preflight
 from opshub_hub.runner import Runner
 from opshub_hub.templates import TemplateCatalog
 from opshub_hub.transport.failover import FailoverTransport
@@ -46,6 +47,23 @@ def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox
         evidence_uploader=evidence_uploader,
         screenshot_capturer=AdbScreenshotCapturer(),
         reset_appium_session=AppiumSessionResetter(),
+    )
+
+
+def build_web_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox) -> Runner:
+    catalog = TemplateCatalog(config.template_root)
+    execution_root = config.data_root / "executions"
+    evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url, hub_token=config.hub_token)
+    return Runner(
+        catalog=catalog,
+        execution_root=execution_root,
+        launcher=_SubprocessLauncherImpl(),
+        outbox=outbox,
+        transport=transport,
+        evidence_uploader=evidence_uploader,
+        screenshot_capturer=WebScreenshotCapturer(),
+        reset_appium_session=None,
+        command_builder=web_command_builder,
     )
 
 
@@ -111,7 +129,13 @@ def _heartbeat_while_running(transport: FailoverTransport, interval: float = HEA
 def run_forever(config: HubConfig | None = None) -> None:
     config = config or load_config()
 
-    preflight = run_preflight(template_root=config.template_root, data_root=config.data_root)
+    if config.platform == "WEB":
+        chrome_profile_dir = config.data_root / "chrome-profile"
+        preflight = run_web_preflight(
+            template_root=config.template_root, data_root=config.data_root, chrome_profile_dir=chrome_profile_dir
+        )
+    else:
+        preflight = run_preflight(template_root=config.template_root, data_root=config.data_root)
     if not preflight.ok:
         for failure in preflight.failures():
             logger.error("Preflight check failed: %s (%s)", failure.name, failure.detail)
@@ -125,7 +149,7 @@ def run_forever(config: HubConfig | None = None) -> None:
     )
     transport.ws_transport.connect()
 
-    runner = build_runner(config, transport, outbox)
+    runner = build_web_runner(config, transport, outbox) if config.platform == "WEB" else build_runner(config, transport, outbox)
 
     while True:
         outbox.flush(transport)
