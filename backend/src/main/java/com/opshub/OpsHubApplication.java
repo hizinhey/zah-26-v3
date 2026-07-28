@@ -4,7 +4,6 @@ import com.opshub.validation.application.ThumbnailValidationProperties;
 import com.opshub.generation.application.TemplateReadinessProperties;
 import com.opshub.hub.application.HubProperties;
 import com.opshub.evidence.application.EvidenceProperties;
-import com.opshub.execution.application.WebWorkerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,7 +14,7 @@ import java.time.Clock;
 
 @SpringBootApplication
 @EnableConfigurationProperties({ThumbnailValidationProperties.class, TemplateReadinessProperties.class,
-        HubProperties.class, EvidenceProperties.class, WebWorkerProperties.class})
+        HubProperties.class, EvidenceProperties.class})
 @EnableScheduling // I4 fix: ExecutionService#sweepAbandonedExecutions
 public class OpsHubApplication {
     public static void main(String[] args) {
