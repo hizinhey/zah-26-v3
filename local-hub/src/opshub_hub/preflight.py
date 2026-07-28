@@ -75,6 +75,7 @@ def run_preflight(
     run_command: CommandRunner = _default_run_command,
     probe_url: Prober = _default_probe,
     catalog_factory: Callable[[Path], TemplateCatalog] = TemplateCatalog,
+    wdio_project_root: Path | None = None,
 ) -> PreflightReport:
     report = PreflightReport()
 
@@ -122,6 +123,23 @@ def run_preflight(
         report.checks.append(CheckResult(name="template-manifest-checksum", ok=True))
     except TemplateIntegrityError as exc:
         report.checks.append(CheckResult(name="template-manifest-checksum", ok=False, detail=str(exc)))
+
+    if wdio_project_root is not None:
+        missing = [
+            name
+            for name in ("wdio.conf.ts", "tsconfig.json", "node_modules")
+            if not (wdio_project_root / name).exists()
+        ]
+        wdio_bin = wdio_project_root / "node_modules" / ".bin" / "wdio"
+        if not missing and not wdio_bin.exists():
+            missing.append("node_modules/.bin/wdio")
+        report.checks.append(
+            CheckResult(
+                name="wdio-project-installed",
+                ok=not missing,
+                detail=f"missing under {wdio_project_root}: {', '.join(missing)}" if missing else "",
+            )
+        )
 
     for name, directory in (("data-root", data_root),):
         try:

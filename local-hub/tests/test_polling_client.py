@@ -19,6 +19,8 @@ def make_config() -> HubConfig:
         hub_token="secret-hub-token",
         template_root=Path("/tmp/templates"),
         data_root=Path("/tmp/data"),
+        wdio_project_root=Path("/tmp/wdio-project"),
+        node_executable=Path("/usr/bin/node"),
     )
 
 

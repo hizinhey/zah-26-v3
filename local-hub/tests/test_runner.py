@@ -13,7 +13,7 @@ from opshub_hub.models import (
     TestResultStatus,
 )
 from opshub_hub.outbox import Outbox
-from opshub_hub.runner import ProcessResult, Runner
+from opshub_hub.runner import ProcessResult, Runner, build_wdio_command_builder, default_command_builder
 from opshub_hub.templates import TemplateCatalog
 
 TEMPLATE_ROOT = Path(__file__).resolve().parents[1] / "templates" / "android"
@@ -311,3 +311,31 @@ def test_outbox_retains_envelopes_when_transport_flush_fails(tmp_path):
     assert transport.sent == []
     # 2 JOB_PROGRESS + 1 TEST_RESULT per test case, all still queued.
     assert len(outbox) == 15
+
+
+def test_default_command_builder_uses_npx_wdio():
+    command = default_command_builder(Path("/tmp/exec/tests/example.spec.ts"))
+    assert command == ["npx", "wdio", "run", "wdio.conf.ts", "--spec", "/tmp/exec/tests/example.spec.ts"]
+
+
+def test_build_wdio_command_builder_uses_the_pinned_node_and_project_wdio_cli(tmp_path):
+    """Node-version fix regression test: the real command must invoke the pinned
+    node_executable running the pinned project's own node_modules/.bin/wdio directly, never
+    `npx` (which has no guarantee about which `node` it resolves, or that a `wdio.conf.ts`
+    even exists to run - see runner.default_command_builder's docstring)."""
+    node_executable = Path("/opt/node22/bin/node")
+    wdio_project_root = tmp_path / "wdio-project"
+    spec_path = Path("/tmp/exec/tests/example.spec.ts")
+
+    command_builder = build_wdio_command_builder(node_executable, wdio_project_root)
+    command = command_builder(spec_path)
+
+    assert command == [
+        str(node_executable),
+        str(wdio_project_root / "node_modules" / ".bin" / "wdio"),
+        "run",
+        "wdio.conf.ts",
+        "--spec",
+        str(spec_path),
+    ]
+    assert "npx" not in command

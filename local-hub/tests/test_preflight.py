@@ -39,6 +39,56 @@ def test_all_checks_pass_when_everything_is_healthy(tmp_path):
     assert "zalo-package-installed" in names
     assert "template-manifest-checksum" in names
     assert "writable:data-root" in names
+    assert "wdio-project-installed" not in names, (
+        "the check should only run when wdio_project_root is actually passed"
+    )
+
+
+def _make_installed_wdio_project(root: Path) -> Path:
+    root.mkdir()
+    (root / "wdio.conf.ts").write_text("export const config = {};")
+    (root / "tsconfig.json").write_text("{}")
+    bin_dir = root / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "wdio").write_text("#!/usr/bin/env node\n")
+    return root
+
+
+def test_wdio_project_installed_check_passes_when_fully_installed(tmp_path):
+    wdio_project_root = _make_installed_wdio_project(tmp_path / "wdio-project")
+
+    report = run_preflight(
+        template_root=TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        run_command=_happy_run_command,
+        probe_url=lambda url, timeout=5.0: True,
+        catalog_factory=lambda root: _OkCatalog(),
+        wdio_project_root=wdio_project_root,
+    )
+
+    check = next(c for c in report.checks if c.name == "wdio-project-installed")
+    assert check.ok is True
+
+
+def test_wdio_project_installed_check_fails_when_node_modules_missing(tmp_path):
+    wdio_project_root = tmp_path / "wdio-project"
+    wdio_project_root.mkdir()
+    (wdio_project_root / "wdio.conf.ts").write_text("export const config = {};")
+    (wdio_project_root / "tsconfig.json").write_text("{}")
+    # node_modules deliberately absent.
+
+    report = run_preflight(
+        template_root=TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        run_command=_happy_run_command,
+        probe_url=lambda url, timeout=5.0: True,
+        catalog_factory=lambda root: _OkCatalog(),
+        wdio_project_root=wdio_project_root,
+    )
+
+    check = next(c for c in report.checks if c.name == "wdio-project-installed")
+    assert check.ok is False
+    assert "node_modules" in check.detail
 
 
 def test_no_authorized_device_fails_adb_device_state_check(tmp_path):

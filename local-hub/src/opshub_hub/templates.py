@@ -94,10 +94,22 @@ def materialize_execution_dir(
     catalog: TemplateCatalog,
     execution_dir: Path,
     test_cases: list,
+    wdio_project_root: Path | None = None,
 ) -> dict[str, Path]:
     """Render every test case's spec into a fresh execution directory alongside a
     copy of the shared page objects. Returns a mapping of testCaseId (str) -> spec
     file path, in the same order as `test_cases`.
+
+    When `wdio_project_root` is given (a real WebdriverIO project - `wdio.conf.ts`,
+    `tsconfig.json`, and an installed `node_modules` - see `OPSHUB_WDIO_PROJECT_DIR`),
+    that project's config/tsconfig are copied in and its `node_modules` symlinked in,
+    so the execution directory becomes a fully self-contained, runnable WebdriverIO
+    project: a spec here can `import` its page objects (resolved relative to the spec
+    file) and page objects/wdio.conf.ts can resolve `node_modules` packages (resolved
+    by walking up from each importing file), all without ever touching the shared
+    project directory concurrently. This mirrors the exact symlink-and-render pattern
+    already validated by
+    `local-hub/tests/templates/test_template_catalog.py::test_rendered_specs_typecheck_with_the_local_wdio_dependencies`.
     """
     execution_dir.mkdir(parents=True, exist_ok=True)
     tests_dir = execution_dir / "tests"
@@ -106,6 +118,15 @@ def materialize_execution_dir(
     pages_dst = execution_dir / "pages"
     if pages_src.is_dir() and not pages_dst.exists():
         shutil.copytree(pages_src, pages_dst)
+
+    if wdio_project_root is not None:
+        node_modules_dst = execution_dir / "node_modules"
+        if not node_modules_dst.exists():
+            node_modules_dst.symlink_to(wdio_project_root / "node_modules", target_is_directory=True)
+        for filename in ("wdio.conf.ts", "tsconfig.json"):
+            destination = execution_dir / filename
+            if not destination.exists():
+                shutil.copy2(wdio_project_root / filename, destination)
 
     spec_paths: dict[str, Path] = {}
     for test_case in test_cases:
