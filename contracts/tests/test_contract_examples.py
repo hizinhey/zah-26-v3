@@ -194,7 +194,7 @@ def test_operation_oa_endpoints_match_the_persisted_android_contract(openapi):
     assert schemas["ReplaceOasRequest"]["properties"]["expectedRevision"] == {
         "$ref": "#/components/schemas/Revision"
     }
-    assert schemas["OfficialAccountInput"]["properties"]["platform"] == {"const": "ANDROID"}
+    assert schemas["OfficialAccountInput"]["properties"]["platform"] == {"enum": ["ANDROID", "WEB"]}
     assert schemas["RevisionConflictError"]["required"] == ["code", "message", "currentRevision"]
     assert schemas["RevisionConflictError"]["properties"]["code"] == {"const": "REVISION_CONFLICT"}
 

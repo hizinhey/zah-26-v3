@@ -87,7 +87,12 @@
             "android-thumbnail-v1",
             "android-content-v1",
             "android-button-text-v1",
-            "android-redirect-v1"
+            "android-redirect-v1",
+            "web-oa-delivery-v1",
+            "web-thumbnail-v1",
+            "web-content-v1",
+            "web-button-text-v1",
+            "web-redirect-v1"
           ]
         },
         "templateVersion": { "type": "integer", "minimum": 1 },
@@ -108,7 +113,7 @@
         "executionId": { "$ref": "#/$defs/Uuid" },
         "idempotencyKey": { "type": "string", "minLength": 1 },
         "revision": { "$ref": "#/$defs/Revision" },
-        "platform": { "const": "ANDROID" },
+        "platform": { "enum": ["ANDROID", "WEB"] },
         "testCases": { "$ref": "#/$defs/OrderedTestCases" },
         "leaseToken": { "$ref": "#/$defs/Uuid" }
       }

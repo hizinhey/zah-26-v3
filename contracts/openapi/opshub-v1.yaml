@@ -212,7 +212,7 @@ components:
       additionalProperties: false
       required: [platform, oaName, thumbnailUrl, content, buttonText, redirectUrl]
       properties:
-        platform: { const: ANDROID }
+        platform: { enum: [ANDROID, WEB] }
         oaName: { type: string, minLength: 1 }
         thumbnailUrl: { type: string, format: uri }
         content: { type: string, minLength: 1 }
@@ -241,7 +241,7 @@ components:
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         oaOrder: { type: integer, minimum: 1 }
-        platform: { const: ANDROID }
+        platform: { enum: [ANDROID, WEB] }
         oaName: { type: string, minLength: 1 }
         thumbnailUrl: { type: string, format: uri }
         content: { type: string, minLength: 1 }
