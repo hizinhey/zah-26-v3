@@ -202,7 +202,10 @@ describe("InputScreen", () => {
     expect(mocks.createOperation).toHaveBeenCalledWith({ jiraId: "ZVAS-1424" });
     expect(mocks.replaceOperationOas).toHaveBeenCalledWith(
       "op-new",
-      expect.objectContaining({ expectedRevision: 1 }),
+      expect.objectContaining({
+        expectedRevision: 1,
+        oas: [expect.objectContaining({ oaName: "zBusiness" })],
+      }),
     );
     expect(mocks.validateOperation).toHaveBeenCalledWith("op-new", { expectedRevision: 2 });
   });

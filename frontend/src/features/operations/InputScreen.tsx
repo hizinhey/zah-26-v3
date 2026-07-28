@@ -32,8 +32,12 @@ function emptyOa(): OfficialAccountInput {
   };
 }
 
+// The OA editor has no field for the OA's real Zalo account name (only thumbnail/content/
+// button/redirect), so there's currently nothing for an operator to enter here. Every OA
+// under test right now is the "zBusiness" account - hardcoded until the editor gains a real
+// OA Name input.
 function withOaNames(oas: OfficialAccountInput[]): OfficialAccountInput[] {
-  return oas.map((oa, index) => ({ ...oa, oaName: `OA #${index + 1}` }));
+  return oas.map((oa) => ({ ...oa, oaName: "zBusiness" }));
 }
 
 function isOaComplete(oa: OfficialAccountInput): boolean {
