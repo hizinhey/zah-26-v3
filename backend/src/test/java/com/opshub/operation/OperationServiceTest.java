@@ -60,6 +60,29 @@ class OperationServiceTest {
     }
 
     @Test
+    void acceptsWebOfficialAccounts() {
+        Operation operation = service.create("MOB-127");
+
+        Operation updated = service.replaceOas(operation.getId(), 1, List.of(
+                oa("WEB", "Web account")
+        ));
+
+        assertThat(updated.getOfficialAccounts()).extracting(account -> account.getPlatform())
+                .containsExactly("WEB");
+    }
+
+    @Test
+    void rejectsMixedPlatformsWithinOneOperation() {
+        Operation operation = service.create("MOB-128");
+
+        assertThatThrownBy(() -> service.replaceOas(operation.getId(), 1, List.of(
+                oa("ANDROID", "Android account"),
+                oa("WEB", "Web account")
+        ))).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("same platform");
+    }
+
+    @Test
     void replacesOfficialAccountsInProvidedOrderAndInvalidatesDownstreamReferences() {
         Operation operation = service.create("MOB-125");
         UUID validationRunId = UUID.randomUUID();

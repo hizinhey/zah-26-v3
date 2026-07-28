@@ -84,12 +84,18 @@ public class OperationService {
         if (oas == null) {
             throw new IllegalArgumentException("oas must not be null");
         }
+        String platform = null;
         for (SaveOaCommand oa : oas) {
             if (oa == null) {
                 throw new IllegalArgumentException("oa must not be null");
             }
-            if (!"ANDROID".equals(oa.platform())) {
+            if (!"ANDROID".equals(oa.platform()) && !"WEB".equals(oa.platform())) {
                 throw new UnsupportedPlatformException(oa.platform());
+            }
+            if (platform == null) {
+                platform = oa.platform();
+            } else if (!platform.equals(oa.platform())) {
+                throw new IllegalArgumentException("All official accounts in one Operation must share the same platform");
             }
             if (isBlank(oa.oaName()) || isBlank(oa.thumbnailUrl()) || isBlank(oa.content())
                     || isBlank(oa.buttonText()) || isBlank(oa.redirectUrl())) {
