@@ -29,7 +29,7 @@
 - Produces: `OfficialAccountInput.platform` and `OfficialAccount.platform` accept `ANDROID` or `WEB` (OpenAPI).
 - Produces: `JobOfferedPayload.platform` accepts `ANDROID` or `WEB`; `TestCase.templateId` enum includes the 5 new `web-*-v1` ids alongside the 5 `android-*-v1` ids (JSON Schema).
 
-- [ ] **Step 1: Update the OpenAPI schema**
+- [x] **Step 1: Update the OpenAPI schema**
 
 In `contracts/openapi/opshub-v1.yaml`, change both occurrences of `platform: { const: ANDROID }` (lines 215 and 244, inside `OfficialAccountInput` and `OfficialAccount`) to:
 
@@ -37,7 +37,7 @@ In `contracts/openapi/opshub-v1.yaml`, change both occurrences of `platform: { c
         platform: { enum: [ANDROID, WEB] }
 ```
 
-- [ ] **Step 2: Update the Hub-envelope JSON Schema**
+- [x] **Step 2: Update the Hub-envelope JSON Schema**
 
 In `contracts/schemas/hub-envelope-v1.json`, change the `TestCase.templateId` property (around line 83-92):
 
@@ -65,7 +65,7 @@ Change `JobOfferedPayload.platform` (around line 111):
         "platform": { "enum": ["ANDROID", "WEB"] },
 ```
 
-- [ ] **Step 3: Update the contract example test's schema assertion**
+- [x] **Step 3: Update the contract example test's schema assertion**
 
 In `contracts/tests/test_contract_examples.py`, line 197 currently asserts:
 
@@ -79,7 +79,7 @@ Change it to:
         assert schemas["OfficialAccountInput"]["properties"]["platform"] == {"enum": ["ANDROID", "WEB"]}
 ```
 
-- [ ] **Step 4: Run the contract tests**
+- [x] **Step 4: Run the contract tests**
 
 ```bash
 python -m pytest contracts/tests -q
@@ -87,7 +87,7 @@ python -m pytest contracts/tests -q
 
 Expected: all pass (the existing Android-only fixtures at the top of the file, lines 13-26, are still valid — `"ANDROID"` remains an accepted value).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add contracts/openapi/opshub-v1.yaml contracts/schemas/hub-envelope-v1.json contracts/tests/test_contract_examples.py
@@ -106,7 +106,7 @@ git commit -m "feat: accept WEB platform in OpenAPI and Hub-envelope contracts"
 **Interfaces:**
 - Produces: `OperationService.replaceOas` accepts `platform = "WEB"` official accounts; throws `IllegalArgumentException` if an Operation's OAs mix platforms; still throws `UnsupportedPlatformException` for anything other than `ANDROID`/`WEB`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `backend/src/test/java/com/opshub/operation/OperationServiceTest.java`, after `rejectsNonAndroidOfficialAccounts` (after line 60):
 
@@ -135,7 +135,7 @@ Add to `backend/src/test/java/com/opshub/operation/OperationServiceTest.java`, a
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=OperationServiceTest test
@@ -143,7 +143,7 @@ sudo ./mvnw -pl backend -am -Dtest=OperationServiceTest test
 
 Expected: `acceptsWebOfficialAccounts` fails with `UnsupportedPlatformException`; `rejectsMixedPlatformsWithinOneOperation` fails because no such rejection exists yet.
 
-- [ ] **Step 3: Update `UnsupportedPlatformException`'s message**
+- [x] **Step 3: Update `UnsupportedPlatformException`'s message**
 
 In `backend/src/main/java/com/opshub/operation/application/UnsupportedPlatformException.java`:
 
@@ -157,7 +157,7 @@ public class UnsupportedPlatformException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 4: Update `OperationService.validateOfficialAccounts`**
+- [x] **Step 4: Update `OperationService.validateOfficialAccounts`**
 
 In `backend/src/main/java/com/opshub/operation/application/OperationService.java`, replace the `validateOfficialAccounts` method (lines 83-99):
 
@@ -187,7 +187,7 @@ In `backend/src/main/java/com/opshub/operation/application/OperationService.java
     }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=OperationServiceTest test
@@ -195,7 +195,7 @@ sudo ./mvnw -pl backend -am -Dtest=OperationServiceTest test
 
 Expected: all pass, including the pre-existing `rejectsNonAndroidOfficialAccounts` (still rejects `"IOS"`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/operation/application/OperationService.java \
@@ -226,7 +226,7 @@ Derived from the reference project committed in `696e853` (`pages/*.PC_Web.ts`, 
 **Interfaces:**
 - Produces: `local-hub/templates/web/manifest.json` with `catalogVersion: "web-v1"` and 5 template entries, each with a real `sha256` computed in Step 2 below.
 
-- [ ] **Step 1: Create the page objects**
+- [x] **Step 1: Create the page objects**
 
 Create `local-hub/templates/web/pages/zalo-app.page.ts`:
 
@@ -442,7 +442,7 @@ class ZBusinessChatWeb {
 export default new ZBusinessChatWeb();
 ```
 
-- [ ] **Step 2: Create the five spec templates**
+- [x] **Step 2: Create the five spec templates**
 
 Create `local-hub/templates/web/tests/web-oa-delivery-v1.spec.ts.hbs`:
 
@@ -575,7 +575,7 @@ describe('@web OA redirect', () => {
 });
 ```
 
-- [ ] **Step 3: Compute each template's checksum**
+- [x] **Step 3: Compute each template's checksum**
 
 ```bash
 cd local-hub/templates/web
@@ -587,7 +587,7 @@ cd -
 
 Record the five printed hashes — they go into `manifest.json` in Step 4 and into `WebTemplateId` in Task 4.
 
-- [ ] **Step 4: Create the manifest**
+- [x] **Step 4: Create the manifest**
 
 Create `local-hub/templates/web/manifest.json`, substituting `<sha256-oa-delivery>` etc. with the exact hashes computed in Step 3 (do not reuse the placeholder text below — those are not real hashes):
 
@@ -634,7 +634,7 @@ Create `local-hub/templates/web/manifest.json`, substituting `<sha256-oa-deliver
 }
 ```
 
-- [ ] **Step 5: Write a catalog-loading test**
+- [x] **Step 5: Write a catalog-loading test**
 
 Create `local-hub/tests/templates/test_web_template_catalog.py` (mirrors `local-hub/tests/templates/test_template_catalog.py`'s structure for the Android catalog — read that file first for the exact assertions it makes, then write the equivalent against the Web catalog):
 
@@ -690,7 +690,7 @@ def test_every_template_renders_with_no_leftover_placeholders():
         assert "zBusiness" in rendered
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [x] **Step 6: Run the test to verify it passes**
 
 ```bash
 cd local-hub && python -m pytest tests/templates/test_web_template_catalog.py -v
@@ -698,14 +698,14 @@ cd local-hub && python -m pytest tests/templates/test_web_template_catalog.py -v
 
 Expected: `3 passed`. If `test_catalog_verifies_checksums` fails, the hashes pasted into `manifest.json` in Step 4 don't match the actual file contents — recompute with Step 3's command and fix `manifest.json`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add local-hub/templates/web local-hub/tests/templates/test_web_template_catalog.py
 git commit -m "feat: add Web template catalog (5 templates, page objects, manifest)"
 ```
 
-- [ ] **Step 8: Retire the raw reference dump**
+- [x] **Step 8: Retire the raw reference dump**
 
 The clean, parameterized templates created above are now the tracked source of truth; the raw reference project committed in `696e853` (`config/`, `pages/`, `tests/`, `wdio.conf.ts`, `package.json`, `package-lock.json`, `tsconfig.json` at the repo root) is a second, drifting copy of the same logic and should not remain there, per the design spec's "Reference material" section:
 
@@ -713,7 +713,7 @@ The clean, parameterized templates created above are now the tracked source of t
 git rm -r config pages tests wdio.conf.ts package.json package-lock.json tsconfig.json
 ```
 
-- [ ] **Step 9: Commit the removal**
+- [x] **Step 9: Commit the removal**
 
 ```bash
 git commit -m "chore: remove raw PC Web/Android reference project, superseded by local-hub/templates/"
@@ -733,7 +733,7 @@ git commit -m "chore: remove raw PC Web/Android reference project, superseded by
 - Produces: `TemplateId implements TemplateDescriptor` (platform `"ANDROID"`, unchanged ids/versions/hashes).
 - Produces: `WebTemplateId implements TemplateDescriptor` (platform `"WEB"`), 5 constants using the checksums computed in Task 3 Step 3.
 
-- [ ] **Step 1: Create `TemplateDescriptor`**
+- [x] **Step 1: Create `TemplateDescriptor`**
 
 Create `backend/src/main/java/com/opshub/generation/domain/TemplateDescriptor.java`:
 
@@ -751,7 +751,7 @@ public interface TemplateDescriptor {
 }
 ```
 
-- [ ] **Step 2: Retrofit `TemplateId`**
+- [x] **Step 2: Retrofit `TemplateId`**
 
 In `backend/src/main/java/com/opshub/generation/domain/TemplateId.java`, change the declaration and add the `platform()` method:
 
@@ -797,7 +797,7 @@ public enum TemplateId implements TemplateDescriptor {
 }
 ```
 
-- [ ] **Step 3: Create `WebTemplateId`**
+- [x] **Step 3: Create `WebTemplateId`**
 
 Create `backend/src/main/java/com/opshub/generation/domain/WebTemplateId.java`, substituting the same five hashes computed in Task 3 Step 3 (must byte-for-byte match `local-hub/templates/web/manifest.json`):
 
@@ -843,7 +843,7 @@ public enum WebTemplateId implements TemplateDescriptor {
 }
 ```
 
-- [ ] **Step 4: Compile**
+- [x] **Step 4: Compile**
 
 ```bash
 sudo ./mvnw -pl backend -am -DskipTests compile
@@ -851,7 +851,7 @@ sudo ./mvnw -pl backend -am -DskipTests compile
 
 Expected: `BUILD SUCCESS`. (`TemplateReadinessValidator.validate(TemplateId, ...)` and `FileSystemTemplateReadinessValidator.manifestEntry(Path, TemplateId)` still compile unchanged for now — they're widened to `TemplateDescriptor` in Task 6.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/generation/domain/TemplateDescriptor.java \
@@ -870,7 +870,7 @@ git commit -m "feat: add TemplateDescriptor and WebTemplateId"
 **Interfaces:**
 - Produces: `TemplateReadinessProperties.getWebCatalogVersion()/setWebCatalogVersion(String)`, `getWebTemplateRoot()/setWebTemplateRoot(String)`, defaulting to `"web-v1"` / `"local-hub/templates/web"`.
 
-- [ ] **Step 1: Add the Web fields**
+- [x] **Step 1: Add the Web fields**
 
 In `backend/src/main/java/com/opshub/generation/application/TemplateReadinessProperties.java`, add alongside the existing `catalogVersion`/`templateRoot` fields:
 
@@ -897,7 +897,7 @@ In `backend/src/main/java/com/opshub/generation/application/TemplateReadinessPro
     }
 ```
 
-- [ ] **Step 2: Compile**
+- [x] **Step 2: Compile**
 
 ```bash
 sudo ./mvnw -pl backend -am -DskipTests compile
@@ -905,7 +905,7 @@ sudo ./mvnw -pl backend -am -DskipTests compile
 
 Expected: `BUILD SUCCESS`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/generation/application/TemplateReadinessProperties.java
@@ -926,7 +926,7 @@ git commit -m "feat: add platform-keyed catalog version/root to TemplateReadines
 - Produces: `TemplateReadinessValidator.validate(TemplateDescriptor, TemplateParameters): Readiness` (widened from `TemplateId`).
 - Produces: `TemplateReadinessValidator.catalogVersion(String platform): String` (replaces the no-arg `catalogVersion()`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/src/test/java/com/opshub/generation/FileSystemTemplateReadinessValidatorTest.java`, after the existing test:
 
@@ -962,7 +962,7 @@ Add to `backend/src/test/java/com/opshub/generation/FileSystemTemplateReadinessV
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=FileSystemTemplateReadinessValidatorTest test
@@ -970,7 +970,7 @@ sudo ./mvnw -pl backend -am -Dtest=FileSystemTemplateReadinessValidatorTest test
 
 Expected: compile failure — `catalogVersion(String)` does not exist yet, and `validate` does not resolve the Web template root.
 
-- [ ] **Step 3: Widen the interface**
+- [x] **Step 3: Widen the interface**
 
 In `backend/src/main/java/com/opshub/generation/application/TemplateReadinessValidator.java`:
 
@@ -1004,7 +1004,7 @@ public interface TemplateReadinessValidator {
 }
 ```
 
-- [ ] **Step 4: Make `FileSystemTemplateReadinessValidator` platform-aware**
+- [x] **Step 4: Make `FileSystemTemplateReadinessValidator` platform-aware**
 
 In `backend/src/main/java/com/opshub/generation/application/FileSystemTemplateReadinessValidator.java`, change the import from `com.opshub.generation.domain.TemplateId` to `com.opshub.generation.domain.TemplateDescriptor`, then replace the `validate`, `catalogVersion`, and `manifestEntry` methods:
 
@@ -1062,7 +1062,7 @@ In `backend/src/main/java/com/opshub/generation/application/FileSystemTemplateRe
 
 Remove the now-unused `import com.opshub.generation.domain.TemplateId;` and add `import com.opshub.generation.domain.TemplateDescriptor;` in its place.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=FileSystemTemplateReadinessValidatorTest test
@@ -1070,7 +1070,7 @@ sudo ./mvnw -pl backend -am -Dtest=FileSystemTemplateReadinessValidatorTest test
 
 Expected: all pass, including the pre-existing `keepsTemplatesNotReadyWhenTheManifestCatalogVersionIsWrong` (unmodified — still exercises the Android/default root via `setTemplateRoot`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/generation/application/TemplateReadinessValidator.java \
@@ -1091,7 +1091,7 @@ git commit -m "feat: make TemplateReadinessValidator platform-aware"
 - Consumes: `TemplateDescriptor`, `TemplateId`, `WebTemplateId` (Task 4); `TemplateReadinessValidator.catalogVersion(String)` (Task 6).
 - Produces: `TestPlanService.generate` picks `TemplateId.values()` for `"ANDROID"` OAs or `WebTemplateId.values()` for `"WEB"` OAs, and stores the matching platform's catalog version.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `backend/src/test/java/com/opshub/generation/TestPlanServiceTest.java`, after `generatesFiveFixedCasesForTheCurrentRevisionWithParsedParameters` (after line 65):
 
@@ -1123,7 +1123,7 @@ Add to `backend/src/test/java/com/opshub/generation/TestPlanServiceTest.java`, a
     }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=TestPlanServiceTest test
@@ -1131,7 +1131,7 @@ sudo ./mvnw -pl backend -am -Dtest=TestPlanServiceTest test
 
 Expected: `generatesFiveWebCasesForAWebOperation` fails — `createCases` still only iterates `TemplateId.values()` for every OA regardless of platform.
 
-- [ ] **Step 3: Update `TestPlanService`**
+- [x] **Step 3: Update `TestPlanService`**
 
 In `backend/src/main/java/com/opshub/generation/application/TestPlanService.java`, add the import:
 
@@ -1182,7 +1182,7 @@ Replace `createCases` (lines 151-170):
     }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=TestPlanServiceTest test
@@ -1190,7 +1190,7 @@ sudo ./mvnw -pl backend -am -Dtest=TestPlanServiceTest test
 
 Expected: all pass, including the pre-existing Android-focused tests (unchanged assertions, since `operationWithOneAccount()` is still `"ANDROID"`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/generation/application/TestPlanService.java \
@@ -1209,7 +1209,7 @@ git commit -m "feat: select templates and catalog version by OA platform"
 **Interfaces:**
 - Produces: `HubEnvelopeV1` built by `offerNextJob` carries the offered execution's actual OA platform (`"ANDROID"` or `"WEB"`) instead of the hardcoded literal `"ANDROID"`.
 
-- [ ] **Step 1: Give the existing `approvePlan` helper a platform parameter**
+- [x] **Step 1: Give the existing `approvePlan` helper a platform parameter**
 
 `backend/src/test/java/com/opshub/execution/ExecutionServiceTest.java` has a private helper `approvePlan(UUID operationId, int revision)` (lines 320-344) that inserts a hardcoded `'ANDROID'` `official_accounts` row. Keep the existing two-argument overload (every current test calls it that way) and add a three-argument one it delegates to:
 
@@ -1247,7 +1247,7 @@ git commit -m "feat: select templates and catalog version by OA platform"
 
 This replaces the existing `approvePlan` method (lines 320-344) with the two methods above.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Add to `ExecutionServiceTest`, after `leasesExactlyOneActiveJobPerHub` (after line 111):
 
@@ -1268,7 +1268,7 @@ Add to `ExecutionServiceTest`, after `leasesExactlyOneActiveJobPerHub` (after li
     }
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=ExecutionServiceTest test
@@ -1276,7 +1276,7 @@ sudo ./mvnw -pl backend -am -Dtest=ExecutionServiceTest test
 
 Expected: `reportsTheOperationsActualPlatformInTheJobOfferedPayload` fails — the payload's `platform` is currently always `"ANDROID"`.
 
-- [ ] **Step 4: Derive platform from the operation instead of hardcoding it**
+- [x] **Step 4: Derive platform from the operation instead of hardcoding it**
 
 In `backend/src/main/java/com/opshub/execution/application/ExecutionService.java`, find `buildJobOfferedEnvelope` (starts at line 330) and its final construction line:
 
@@ -1303,7 +1303,7 @@ Then change the final construction line to use `platform` instead of the literal
 
 (This query relies on the Task 2 invariant that every OA in an Operation shares one platform — `DISTINCT` returning more than one row would mean that invariant was violated elsewhere; `queryForObject` throwing `IncorrectResultSizeDataAccessException` in that case is an acceptable failure mode, not one this task needs to handle specially.)
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=ExecutionServiceTest test
@@ -1311,7 +1311,7 @@ sudo ./mvnw -pl backend -am -Dtest=ExecutionServiceTest test
 
 Expected: passes, including all pre-existing tests in that file (Android fixtures still assert `platform == "ANDROID"`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/execution/application/ExecutionService.java \
@@ -1331,13 +1331,13 @@ git commit -m "fix: report the operation's actual platform in the Hub job envelo
 - Produces: `JobOfferedPayload.platform: Literal["ANDROID", "WEB"]`.
 - Produces: `ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM: dict[str, tuple[str, ...]]` (replaces the single `ORDERED_TEST_CASE_TEMPLATE_IDS` tuple — keeps the old name as an alias for the `"ANDROID"` entry so nothing else referencing it by that name breaks).
 
-- [ ] **Step 1: Read the existing test file to match its fixture style**
+- [x] **Step 1: Read the existing test file to match its fixture style**
 
 ```bash
 grep -n "JobOfferedPayload\|ORDERED_TEST_CASE" local-hub/tests/test_models.py
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add to `local-hub/tests/test_models.py` (adapt the exact `TestCase`/`TemplateParametersV1` construction helpers already used elsewhere in that file rather than redefining them):
 
@@ -1380,7 +1380,7 @@ def test_job_offered_payload_rejects_android_template_ids_for_a_web_platform_job
 
 (If the file doesn't already import `pytest` and `ValidationError` from `pydantic`, add those imports. If there's no existing `test_case(...)` helper, build `TestCase(...)` instances directly the same way the file's existing Android tests do, just changing `templateId`.)
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 ```bash
 cd local-hub && python -m pytest tests/test_models.py -k web -v
@@ -1388,7 +1388,7 @@ cd local-hub && python -m pytest tests/test_models.py -k web -v
 
 Expected: `test_job_offered_payload_accepts_web_platform_with_web_template_ids` fails with a `platform` validation error (currently `Literal["ANDROID"]`).
 
-- [ ] **Step 4: Update `models.py`**
+- [x] **Step 4: Update `models.py`**
 
 In `local-hub/src/opshub_hub/models.py`, replace the `ORDERED_TEST_CASE_TEMPLATE_IDS` block and `JobOfferedPayload` (lines 70-128):
 
@@ -1482,7 +1482,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 `field_validator` has exactly one usage in this file — the `validate_ordered_test_cases` method being replaced — so it's safe to drop from the import entirely.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 ```bash
 cd local-hub && python -m pytest tests/test_models.py -v
@@ -1490,7 +1490,7 @@ cd local-hub && python -m pytest tests/test_models.py -v
 
 Expected: all pass, including every pre-existing Android-focused `JobOfferedPayload` test (the `"ANDROID"` branch of `ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM` is identical to the old single tuple).
 
-- [ ] **Step 6: Run the full Local Hub test suite**
+- [x] **Step 6: Run the full Local Hub test suite**
 
 ```bash
 cd local-hub && python -m pytest tests -q
@@ -1498,7 +1498,7 @@ cd local-hub && python -m pytest tests -q
 
 Expected: all pass (checks nothing else imports `ORDERED_TEST_CASE_TEMPLATE_IDS` in a way the alias doesn't satisfy).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add local-hub/src/opshub_hub/models.py local-hub/tests/test_models.py
@@ -1516,7 +1516,7 @@ git commit -m "feat: accept WEB platform and web-*-v1 template ids in JobOffered
 **Interfaces:**
 - Produces: `HubConfig.platform: Literal["ANDROID", "WEB"]`, defaulting to `"ANDROID"` when `OPSHUB_PLATFORM` is unset (unlike the other five config vars, this one is optional).
 
-- [ ] **Step 1: Check for an existing config test file**
+- [x] **Step 1: Check for an existing config test file**
 
 ```bash
 find local-hub/tests -iname "test_config.py"
@@ -1524,7 +1524,7 @@ find local-hub/tests -iname "test_config.py"
 
 If it exists, read it and follow its existing style for the new test below. If not, create it fresh as shown in Step 2.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add (or create the file with) these tests:
 
@@ -1554,7 +1554,7 @@ def test_platform_reads_from_env_when_set():
     assert config.platform == "WEB"
 ```
 
-- [ ] **Step 3: Run the tests to verify they fail**
+- [x] **Step 3: Run the tests to verify they fail**
 
 ```bash
 cd local-hub && python -m pytest tests/test_config.py -v
@@ -1562,7 +1562,7 @@ cd local-hub && python -m pytest tests/test_config.py -v
 
 Expected: `AttributeError` — `HubConfig` has no `platform` attribute yet.
 
-- [ ] **Step 4: Update `config.py`**
+- [x] **Step 4: Update `config.py`**
 
 In `local-hub/src/opshub_hub/config.py`, add the field to `HubConfig` (after `data_root`):
 
@@ -1592,7 +1592,7 @@ def load_config(env: dict | None = None) -> HubConfig:
     )
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 ```bash
 cd local-hub && python -m pytest tests/test_config.py -v
@@ -1600,7 +1600,7 @@ cd local-hub && python -m pytest tests/test_config.py -v
 
 Expected: both pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add local-hub/src/opshub_hub/config.py local-hub/tests/test_config.py
@@ -1618,7 +1618,7 @@ git commit -m "feat: add optional platform field to HubConfig"
 **Interfaces:**
 - Produces: `run_web_preflight(*, template_root: Path, data_root: Path, chrome_profile_dir: Path, required_executables: tuple[str, ...] = ("node",), run_command: CommandRunner = _default_run_command, catalog_factory: Callable[[Path], TemplateCatalog] = TemplateCatalog) -> PreflightReport`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `local-hub/tests/test_preflight.py`:
 
@@ -1672,7 +1672,7 @@ def test_web_preflight_fails_when_chrome_profile_directory_is_missing(tmp_path):
     assert "does-not-exist" in failure.detail
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 cd local-hub && python -m pytest tests/test_preflight.py -k web -v
@@ -1680,7 +1680,7 @@ cd local-hub && python -m pytest tests/test_preflight.py -k web -v
 
 Expected: `ImportError` — `run_web_preflight` doesn't exist yet.
 
-- [ ] **Step 3: Implement `run_web_preflight`**
+- [x] **Step 3: Implement `run_web_preflight`**
 
 Add to `local-hub/src/opshub_hub/preflight.py`, after `run_preflight`:
 
@@ -1736,7 +1736,7 @@ def run_web_preflight(
     return report
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 cd local-hub && python -m pytest tests/test_preflight.py -v
@@ -1744,7 +1744,7 @@ cd local-hub && python -m pytest tests/test_preflight.py -v
 
 Expected: all pass, including every pre-existing `run_preflight` (Android) test, unmodified.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add local-hub/src/opshub_hub/preflight.py local-hub/tests/test_preflight.py
@@ -1765,7 +1765,7 @@ git commit -m "feat: add run_web_preflight (no adb/Appium, Chrome profile check)
 
 Design note carried from the design spec: the WebdriverIO subprocess itself (via an `afterTest` hook in the operator-provisioned `wdio.web.conf.ts`, see Task 15's runbook update) writes each test's screenshot to a fixed, predictable path — `evidence/last-screenshot.png` relative to its own working directory (which `Runner` always sets to the job's `execution_dir`, i.e. the parent of `evidence/`). `WebScreenshotCapturer` doesn't take a new screenshot; it locates the one WebdriverIO already wrote and moves it to the attempt-specific `destination` `Runner` asks for, so two attempts (retry) or two test cases never collide on the same fixed filename.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `local-hub/tests/test_browser_control.py`:
 
@@ -1810,7 +1810,7 @@ def test_screenshot_capturer_raises_when_wdio_never_wrote_a_screenshot(tmp_path)
         capturer(destination)
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 ```bash
 cd local-hub && python -m pytest tests/test_browser_control.py -v
@@ -1818,7 +1818,7 @@ cd local-hub && python -m pytest tests/test_browser_control.py -v
 
 Expected: `ModuleNotFoundError` — `opshub_hub.browser_control` doesn't exist yet.
 
-- [ ] **Step 3: Implement `browser_control.py`**
+- [x] **Step 3: Implement `browser_control.py`**
 
 Create `local-hub/src/opshub_hub/browser_control.py`:
 
@@ -1859,7 +1859,7 @@ class WebScreenshotCapturer:
         return destination
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 cd local-hub && python -m pytest tests/test_browser_control.py -v
@@ -1867,7 +1867,7 @@ cd local-hub && python -m pytest tests/test_browser_control.py -v
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add local-hub/src/opshub_hub/browser_control.py local-hub/tests/test_browser_control.py
@@ -1886,7 +1886,7 @@ git commit -m "feat: add Web command builder and screenshot capturer"
 - Consumes: `run_web_preflight` (Task 11), `web_command_builder`/`WebScreenshotCapturer` (Task 12), `HubConfig.platform` (Task 10).
 - Produces: `build_web_runner(config, transport, outbox) -> Runner`; `run_forever` runs Android or Web preflight/runner construction based on `config.platform`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `local-hub/tests/test_main.py`:
 
@@ -1913,7 +1913,7 @@ def test_build_web_runner_uses_the_web_command_builder_and_screenshot_capturer(t
     assert runner._command_builder(Path("/exec/tests/x.spec.ts"))[2] == "wdio.web.conf.ts"
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 cd local-hub && python -m pytest tests/test_main.py -k web -v
@@ -1921,7 +1921,7 @@ cd local-hub && python -m pytest tests/test_main.py -k web -v
 
 Expected: `ImportError` — `build_web_runner` doesn't exist yet.
 
-- [ ] **Step 3: Add `build_web_runner` and platform dispatch**
+- [x] **Step 3: Add `build_web_runner` and platform dispatch**
 
 In `local-hub/src/opshub_hub/main.py`, add imports:
 
@@ -1974,7 +1974,7 @@ Later in the same function, replace `runner = build_runner(config, transport, ou
     runner = build_web_runner(config, transport, outbox) if config.platform == "WEB" else build_runner(config, transport, outbox)
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 ```bash
 cd local-hub && python -m pytest tests/test_main.py -v
@@ -1982,7 +1982,7 @@ cd local-hub && python -m pytest tests/test_main.py -v
 
 Expected: all pass, including the pre-existing Android `build_runner` test, unmodified.
 
-- [ ] **Step 5: Run the full Local Hub test suite**
+- [x] **Step 5: Run the full Local Hub test suite**
 
 ```bash
 cd local-hub && python -m pytest tests -q
@@ -1990,7 +1990,7 @@ cd local-hub && python -m pytest tests -q
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add local-hub/src/opshub_hub/main.py local-hub/tests/test_main.py
@@ -2012,7 +2012,7 @@ git commit -m "feat: wire the Web execution path into the Local Hub entrypoint"
 - Produces: `WebWorkerLauncher.launchIfNeeded(): void` — no-op when `enabled=false` or a launch is already in flight; otherwise starts the Web worker subprocess exactly once until it's known to have exited.
 - Consumes (test seam): `WebWorkerLauncher.ProcessStarter { Process start(List<String> command, Path workingDirectory, Map<String,String> env) throws IOException; }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `backend/src/test/java/com/opshub/execution/WebWorkerLauncherTest.java`:
 
@@ -2129,7 +2129,7 @@ class WebWorkerLauncherTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=WebWorkerLauncherTest test
@@ -2137,7 +2137,7 @@ sudo ./mvnw -pl backend -am -Dtest=WebWorkerLauncherTest test
 
 Expected: compile failure — `WebWorkerLauncher`/`WebWorkerProperties` don't exist yet.
 
-- [ ] **Step 3: Create `WebWorkerProperties`**
+- [x] **Step 3: Create `WebWorkerProperties`**
 
 Create `backend/src/main/java/com/opshub/execution/application/WebWorkerProperties.java`:
 
@@ -2214,7 +2214,7 @@ public class WebWorkerProperties {
 }
 ```
 
-- [ ] **Step 4: Create `WebWorkerLauncher`**
+- [x] **Step 4: Create `WebWorkerLauncher`**
 
 Create `backend/src/main/java/com/opshub/execution/application/WebWorkerLauncher.java`:
 
@@ -2302,7 +2302,7 @@ public class WebWorkerLauncher {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 ```bash
 sudo ./mvnw -pl backend -am -Dtest=WebWorkerLauncherTest test
@@ -2310,7 +2310,7 @@ sudo ./mvnw -pl backend -am -Dtest=WebWorkerLauncherTest test
 
 Expected: all pass.
 
-- [ ] **Step 6: Wire it into `ExecutionService.start`**
+- [x] **Step 6: Wire it into `ExecutionService.start`**
 
 In `backend/src/main/java/com/opshub/execution/application/ExecutionService.java`, add a constructor parameter and field:
 
@@ -2349,7 +2349,7 @@ grep -rln "new ExecutionService(" backend/src/test
 
 For each match, pass `new WebWorkerLauncher(new WebWorkerProperties(), (command, workingDirectory, env) -> { throw new UnsupportedOperationException(); })` (properties default to `enabled=false`, so `launchIfNeeded()` returns before ever touching the `ProcessStarter` — this is safe for every existing Android-only test).
 
-- [ ] **Step 7: Run the full backend test suite**
+- [x] **Step 7: Run the full backend test suite**
 
 ```bash
 sudo ./mvnw -pl backend -am test
@@ -2357,7 +2357,7 @@ sudo ./mvnw -pl backend -am test
 
 Expected: all pass (Testcontainers-dependent tests may be skipped in a sandbox without Docker — note that rather than blocking on it, per the existing precedent in `docs/superpowers/plans/2026-07-27-evidence-viewer.md` Task 1 Step 5).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/src/main/java/com/opshub/execution/application/WebWorkerLauncher.java \
@@ -2374,7 +2374,7 @@ git commit -m "feat: spawn the Web worker on demand when a Web execution starts"
 **Files:**
 - Modify: `docs/operations/local-hub-runbook.md`
 
-- [ ] **Step 1: Add a Web platform section**
+- [x] **Step 1: Add a Web platform section**
 
 Append a new section to `docs/operations/local-hub-runbook.md`, after the existing Hub/device preflight section (mirror its table/list style):
 
@@ -2419,7 +2419,7 @@ one is already running, the same way a second execution against a
 busy/leased Hub is rejected today.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/operations/local-hub-runbook.md
