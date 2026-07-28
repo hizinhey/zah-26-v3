@@ -2,7 +2,9 @@ package com.opshub.generation.application;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.opshub.generation.domain.TemplateDescriptor;
 import com.opshub.generation.domain.TemplateId;
+import com.opshub.generation.domain.WebTemplateId;
 import com.opshub.operation.application.OperationNotFoundException;
 import com.opshub.operation.application.RevisionConflictException;
 import com.opshub.operation.domain.OfficialAccount;
@@ -54,7 +56,7 @@ public class TestPlanService {
             throw new RevisionConflictException(operation.getRevision());
         }
         requireFullyPassedValidation(operationId, revision);
-        String catalogVersion = templateReadinessValidator.catalogVersion("ANDROID");
+        String catalogVersion = templateReadinessValidator.catalogVersion(platformFor(operation));
 
         UUID planId = UUID.randomUUID();
         List<TestCaseDto> cases = createCases(operation, planId);
@@ -152,7 +154,9 @@ public class TestPlanService {
         List<TestCaseDto> cases = new ArrayList<>();
         for (OfficialAccount account : operation.getOfficialAccounts()) {
             TemplateParameters parameters = parametersFor(account);
-            for (TemplateId template : TemplateId.values()) {
+            List<? extends TemplateDescriptor> templates = templatesFor(account.getPlatform());
+            for (int index = 0; index < templates.size(); index++) {
+                TemplateDescriptor template = templates.get(index);
                 TemplateReadinessValidator.Readiness readiness;
                 try {
                     readiness = templateReadinessValidator.validate(template, parameters);
@@ -160,13 +164,21 @@ public class TestPlanService {
                     readiness = TemplateReadinessValidator.Readiness.notReady("Template readiness validation failed");
                 }
                 cases.add(new TestCaseDto(
-                        UUID.randomUUID(), planId, account.getOaOrder(), template.ordinal() + 1,
+                        UUID.randomUUID(), planId, account.getOaOrder(), index + 1,
                         template.id(), template.version(), template.sha256(), parameters,
                         readiness.ready() ? "READY" : "NOT_READY", readiness.reason()
                 ));
             }
         }
         return cases;
+    }
+
+    private static List<? extends TemplateDescriptor> templatesFor(String platform) {
+        return "WEB".equals(platform) ? List.of(WebTemplateId.values()) : List.of(TemplateId.values());
+    }
+
+    private static String platformFor(Operation operation) {
+        return operation.getOfficialAccounts().get(0).getPlatform();
     }
 
     private TemplateParameters parametersFor(OfficialAccount account) {

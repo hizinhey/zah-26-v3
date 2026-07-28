@@ -65,6 +65,32 @@ class TestPlanServiceTest {
     }
 
     @Test
+    void generatesFiveWebCasesForAWebOperation() {
+        Operation webOperation = operationWithOneWebAccount();
+        RecordingJdbcTemplate jdbcTemplate = new RecordingJdbcTemplate(1, 0);
+        TestPlanService service = new TestPlanService(
+                entityManagerReturning(webOperation), jdbcTemplate, new ContentParser(),
+                TemplateReadinessValidator.alwaysReady()
+        );
+
+        TestPlanService.TestPlanDto plan = service.generate(webOperation.getId(), webOperation.getRevision());
+
+        assertThat(plan.testCases()).extracting(TestPlanService.TestCaseDto::templateId)
+                .containsExactlyElementsOf(List.of(com.opshub.generation.domain.WebTemplateId.values()).stream()
+                        .map(com.opshub.generation.domain.WebTemplateId::id).toList());
+        assertThat(plan.testCases()).extracting(TestPlanService.TestCaseDto::order).containsExactly(1, 2, 3, 4, 5);
+    }
+
+    private static Operation operationWithOneWebAccount() {
+        Operation operation = Operation.create("MOB-501");
+        operation.addOfficialAccount(new OfficialAccount(
+                operation, 1, "WEB", "Account", "https://cdn.example.test/thumb.png",
+                "Header\nBody", "Open now", "https://business.example.test/offer?campaign=summer"
+        ));
+        return operation;
+    }
+
+    @Test
     void keepsAPlanGenerationFailedWhenAnyRenderedTemplateIsNotReady() {
         RecordingJdbcTemplate jdbcTemplate = new RecordingJdbcTemplate(1, 0);
         TestPlanService service = new TestPlanService(
