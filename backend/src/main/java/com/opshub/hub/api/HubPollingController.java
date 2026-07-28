@@ -59,7 +59,7 @@ public class HubPollingController {
         long capped = Math.min(waitSeconds, hubProperties.getPollWaitCapSeconds());
         Instant deadline = Instant.now().plusSeconds(capped);
         do {
-            Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+            Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId, platform);
             if (offer.isPresent()) {
                 return ResponseEntity.ok(offer.get());
             }
@@ -79,7 +79,7 @@ public class HubPollingController {
         // Same lease-renewal-on-heartbeat behavior as the WebSocket transport (see
         // HubWebSocketHandler#handleTextMessage) - looked up server-side by hub ID rather than
         // requiring the payload to carry the lease token.
-        executionService.renewActiveLease(hubId);
+        executionService.renewActiveLease(hubId, platform);
         return ResponseEntity.ok().build();
     }
 

@@ -30,7 +30,10 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
     private final ExecutionService executionService;
     private final HubConnectionService hubConnectionService;
     private final ObjectMapper objectMapper;
-    private final Map<UUID, WebSocketSession> sessionsByHub = new ConcurrentHashMap<>();
+    private final Map<HubPlatformKey, WebSocketSession> sessionsByHubPlatform = new ConcurrentHashMap<>();
+
+    private record HubPlatformKey(UUID hubId, String platform) {
+    }
 
     public HubWebSocketHandler(ExecutionService executionService, HubConnectionService hubConnectionService, ObjectMapper objectMapper) {
         this.executionService = executionService;
@@ -41,43 +44,46 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         UUID hubId = hubId(session);
-        sessionsByHub.put(hubId, session);
-        hubConnectionService.markOnline(hubId, "WEBSOCKET", platform(session));
+        String platform = platform(session);
+        sessionsByHubPlatform.put(new HubPlatformKey(hubId, platform), session);
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", platform);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         UUID hubId = hubId(session);
-        sessionsByHub.remove(hubId, session);
-        hubConnectionService.markOffline(hubId, platform(session));
+        String platform = platform(session);
+        sessionsByHubPlatform.remove(new HubPlatformKey(hubId, platform), session);
+        hubConnectionService.markOffline(hubId, platform);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         UUID hubId = hubId(session);
+        String platform = platform(session);
         HubEnvelopeV1 envelope = objectMapper.readValue(message.getPayload(), HubEnvelopeV1.class);
         switch (envelope.type()) {
             case HubEnvelopeV1.TYPE_HEARTBEAT -> {
                 HubPayloads.HeartbeatPayload payload = objectMapper.convertValue(envelope.payload(), HubPayloads.HeartbeatPayload.class);
-                hubConnectionService.heartbeat(hubId, "WEBSOCKET", payload.deviceReady(), payload.runnerReady(), platform(session));
+                hubConnectionService.heartbeat(hubId, "WEBSOCKET", payload.deviceReady(), payload.runnerReady(), platform);
                 // A heartbeat renews whichever lease the Hub currently holds, so a long-running job
                 // survives past the fixed 60s lease window without the Hub separately tracking and
                 // resending the lease token (looked up server-side by hub ID - see
                 // ExecutionService#renewActiveLease). No-op when the Hub has no active lease.
-                executionService.renewActiveLease(hubId);
-                offerNextJobIfAny(hubId, session);
+                executionService.renewActiveLease(hubId, platform);
+                offerNextJobIfAny(hubId, platform, session);
             }
             case HubEnvelopeV1.TYPE_JOB_PROGRESS -> executionService.recordProgress(envelope);
             case HubEnvelopeV1.TYPE_TEST_RESULT -> {
                 executionService.recordResult(envelope);
-                offerNextJobIfAny(hubId, session);
+                offerNextJobIfAny(hubId, platform, session);
             }
             default -> throw new IllegalArgumentException("Unsupported message type: " + envelope.type());
         }
     }
 
-    private void offerNextJobIfAny(UUID hubId, WebSocketSession session) throws IOException {
-        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+    private void offerNextJobIfAny(UUID hubId, String platform, WebSocketSession session) throws IOException {
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId, platform);
         if (offer.isPresent() && session.isOpen()) {
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(offer.get())));
         }

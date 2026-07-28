@@ -213,12 +213,68 @@ class HubProtocolIT {
         }
     }
 
+    @Test
+    void oneHubIdCanHoldAnActiveAndroidLeaseAndAnActiveWebLeaseAtTheSameTime() throws Exception {
+        UUID androidOperationId = createApprovedOperation("MOB-820");
+        executionService.start(androidOperationId, 1, "concurrent-android-" + UUID.randomUUID());
+        UUID webOperationId = createApprovedWebOperation("MOB-821");
+        executionService.start(webOperationId, 1, "concurrent-web-" + UUID.randomUUID());
+        UUID hubId = UUID.randomUUID();
+
+        HttpHeaders androidHeaders = new HttpHeaders();
+        androidHeaders.set("X-Hub-Token", TOKEN);
+        androidHeaders.set("X-Hub-Platform", "ANDROID");
+        ResponseEntity<HubEnvelopeV1> androidOffer = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(androidHeaders), HubEnvelopeV1.class, port, hubId);
+        assertThat(androidOffer.getStatusCode().value()).isEqualTo(200);
+
+        HttpHeaders webHeaders = new HttpHeaders();
+        webHeaders.set("X-Hub-Token", TOKEN);
+        webHeaders.set("X-Hub-Platform", "WEB");
+        ResponseEntity<HubEnvelopeV1> webOffer = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(webHeaders), HubEnvelopeV1.class, port, hubId);
+        assertThat(webOffer.getStatusCode().value()).isEqualTo(200);
+    }
+
+    private UUID createApprovedWebOperation(String jiraId) {
+        UUID operationId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                        INSERT INTO operations (id, jira_id, revision, status, created_at, updated_at)
+                        VALUES (?, ?, 1, 'DRAFT', now(), now())
+                        """, operationId, jiraId);
+        jdbcTemplate.update("""
+                        INSERT INTO official_accounts (id, operation_id, oa_order, platform, oa_name, thumbnail_url, content, button_text, redirect_url)
+                        VALUES (?, ?, 1, 'WEB', 'Test OA', 'https://example.test/thumb.png', 'content', 'Open', 'https://example.test/redirect')
+                        """, UUID.randomUUID(), operationId);
+        UUID planId = UUID.randomUUID();
+        jdbcTemplate.update("""
+                        INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
+                        VALUES (?, ?, 1, 'web-v1', 'READY', 'APPROVED')
+                        """, planId, operationId);
+        for (int order = 1; order <= 5; order++) {
+            jdbcTemplate.update("""
+                            INSERT INTO test_cases (id, plan_id, oa_order, case_order, template_id, template_version, template_sha256, parameters, status)
+                            VALUES (?, ?, 1, ?, ?, 1, 'sha', '{}', 'READY')
+                            """, UUID.randomUUID(), planId, order, "web-template-" + order);
+        }
+        jdbcTemplate.update("""
+                        UPDATE operations SET status = 'APPROVED', plan_id = ?, approved_plan_id = ? WHERE id = ?
+                        """, planId, planId, operationId);
+        return operationId;
+    }
+
     private UUID createApprovedOperation(String jiraId) {
         UUID operationId = UUID.randomUUID();
         jdbcTemplate.update("""
                         INSERT INTO operations (id, jira_id, revision, status, created_at, updated_at)
                         VALUES (?, ?, 1, 'DRAFT', now(), now())
                         """, operationId, jiraId);
+        jdbcTemplate.update("""
+                        INSERT INTO official_accounts (id, operation_id, oa_order, platform, oa_name, thumbnail_url, content, button_text, redirect_url)
+                        VALUES (?, ?, 1, 'ANDROID', 'Test OA', 'https://example.test/thumb.png', 'content', 'Open', 'https://example.test/redirect')
+                        """, UUID.randomUUID(), operationId);
         UUID planId = UUID.randomUUID();
         jdbcTemplate.update("""
                         INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
