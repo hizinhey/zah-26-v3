@@ -31,11 +31,13 @@
 }
 
 .title {
+  margin: 0;
   font-weight: var(--ops-font-weight-semibold);
   color: var(--ops-color-gray-900);
 }
 
 .detail {
+  margin: 0;
   color: var(--ops-color-gray-500);
   font-size: var(--ops-font-size-sm);
 }

@@ -95,9 +95,10 @@
 }
 
 .hint {
-  margin-top: var(--ops-space-5);
+  margin: 0;
   padding: var(--ops-space-4);
-  background: var(--ops-color-gray-50);
+  background: var(--ops-color-white);
+  border: 1px solid var(--ops-color-gray-200);
   border-radius: var(--ops-radius-md);
   color: var(--ops-color-gray-700);
   font-size: var(--ops-font-size-sm);
@@ -140,5 +141,16 @@
 
 .actions {
   display: flex;
+  flex-direction: column;
+  gap: var(--ops-space-3);
+}
+
+.actionButtonRow {
+  display: flex;
   justify-content: flex-end;
+}
+
+.validateButton {
+  padding: var(--ops-space-4) var(--ops-space-8);
+  font-size: var(--ops-font-size-lg);
 }

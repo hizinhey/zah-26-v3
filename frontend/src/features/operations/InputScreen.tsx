@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StepProgress } from "../../components/StepProgress";
+import { OperationBreadcrumb } from "../../components/OperationBreadcrumb";
 import { Card } from "../../components/Card";
 import { DisabledReason } from "../../components/DisabledReason";
 import { OPERATION_STEPS } from "../../app/router";
@@ -203,6 +204,7 @@ export function InputScreen(): ReactElement {
 
   return (
     <div>
+      <OperationBreadcrumb operationId={operationId} currentStepId="input" />
       <h1 className="ops-page-title">Test Operations</h1>
       <StepProgress steps={OPERATION_STEPS} currentStepId="input" />
 
@@ -288,12 +290,6 @@ export function InputScreen(): ReactElement {
               {conflictMessage}
             </p>
           ) : null}
-
-          <p className={styles.hint}>
-            Vui lòng nhập đầy đủ thông tin cho OA đang chọn.
-            <br />
-            Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo.
-          </p>
         </Card>
 
         <div className={styles.overviewColumn}>
@@ -315,17 +311,24 @@ export function InputScreen(): ReactElement {
           </Card>
 
           <div className={styles.actions}>
-            <DisabledReason reason={submitDisabledReason}>
-              <button
-                type="button"
-                className="ops-primary-button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                <SparkleIcon />
-                {isSubmitting ? "Validating…" : "AI Validation"}
-              </button>
-            </DisabledReason>
+            <div className={styles.actionButtonRow}>
+              <DisabledReason reason={submitDisabledReason}>
+                <button
+                  type="button"
+                  className={`ops-primary-button ${styles.validateButton}`}
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  <SparkleIcon />
+                  {isSubmitting ? "Validating…" : "AI Validation"}
+                </button>
+              </DisabledReason>
+            </div>
+            <p className={styles.hint}>
+              Vui lòng nhập đầy đủ thông tin cho OA đang chọn.
+              <br />
+              Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo.
+            </p>
           </div>
         </div>
       </div>

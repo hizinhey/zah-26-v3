@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { StepProgress } from "../../components/StepProgress";
+import { OperationBreadcrumb } from "../../components/OperationBreadcrumb";
 import { DisabledReason } from "../../components/DisabledReason";
 import { OPERATION_STEPS } from "../../app/router";
 import { isRevisionConflict, useOperationQuery } from "../operations/useOperation";
@@ -104,6 +105,7 @@ export function GenerateScreen(): ReactElement {
 
   return (
     <div>
+      <OperationBreadcrumb operationId={operationId} currentStepId="generate" />
       <h1 className="ops-page-title">Test Operations</h1>
       <StepProgress steps={OPERATION_STEPS} currentStepId="generate" />
 

@@ -1,9 +1,11 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { StepProgress } from "../../components/StepProgress";
+import { OperationBreadcrumb } from "../../components/OperationBreadcrumb";
 import { Card } from "../../components/Card";
 import { StatusBadge, type Status } from "../../components/StatusBadge";
 import { DisabledReason } from "../../components/DisabledReason";
+import { AiIcon } from "../../components/icons";
 import { OPERATION_STEPS } from "../../app/router";
 import type { FieldFinding } from "../../api/generated";
 import {
@@ -139,6 +141,7 @@ export function VerifyScreen(): ReactElement {
 
   return (
     <div>
+      <OperationBreadcrumb operationId={operationId} currentStepId="verify" />
       <h1 className="ops-page-title">Test Operations</h1>
       <StepProgress steps={OPERATION_STEPS} currentStepId="verify" />
 
@@ -237,7 +240,8 @@ export function VerifyScreen(): ReactElement {
       <div className={styles.actions}>
         <DisabledReason reason={generateDisabledReason}>
           <button type="button" className="ops-primary-button" onClick={handleGenerate}>
-            Generate
+            <AiIcon />
+            AI Generate
           </button>
         </DisabledReason>
         {!canGenerate ? (

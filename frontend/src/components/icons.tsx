@@ -1,4 +1,6 @@
 import type { ReactElement, SVGProps } from "react";
+import iosIconUrl from "../assets/ios-icon.png";
+import aiGenerateIconUrl from "../assets/ai-generate-icon.png";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -35,11 +37,16 @@ export function AndroidIcon(props: IconProps): ReactElement {
   );
 }
 
-export function IosIcon(props: IconProps): ReactElement {
+export function IosIcon({ width = 16, height = 16, className }: IconProps): ReactElement {
   return (
-    <svg width={16} height={16} viewBox="0 0 16 16" fill="#1a1a1a" aria-hidden {...props}>
-      <path d="M10.62 2.02c.04.83-.28 1.62-.86 2.2-.59.58-1.4.91-2.2.87-.05-.82.3-1.62.87-2.19.6-.6 1.42-.94 2.19-.88zM12.4 9.28c-.34.79-.5 1.15-.95 1.85-.62.99-1.49 2.22-2.57 2.23-.96.01-1.21-.63-2.51-.62-1.31.01-1.58.63-2.54.62-1.08-.01-1.9-1.12-2.53-2.11-1.4-2.13-1.66-4.36-.66-5.65.72-1.03 1.85-1.64 2.91-1.64 1.08 0 1.76.63 2.66.63.87 0 1.4-.63 2.65-.63.95 0 1.95.52 2.67 1.41-2.35 1.29-1.97 4.62.28 5.51z" />
-    </svg>
+    <img
+      src={iosIconUrl}
+      width={width}
+      height={height}
+      className={className}
+      alt=""
+      aria-hidden="true"
+    />
   );
 }
 
@@ -60,6 +67,19 @@ export function WebIcon(props: IconProps): ReactElement {
       <ellipse cx="8" cy="8" rx="2.75" ry="6.5" />
       <line x1="1.5" y1="8" x2="14.5" y2="8" />
     </svg>
+  );
+}
+
+export function AiIcon({ width = 16, height = 16, className }: IconProps): ReactElement {
+  return (
+    <img
+      src={aiGenerateIconUrl}
+      width={width}
+      height={height}
+      className={className}
+      alt=""
+      aria-hidden="true"
+    />
   );
 }
 

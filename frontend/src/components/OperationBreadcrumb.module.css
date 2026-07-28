@@ -1,0 +1,52 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-4);
+  margin-bottom: var(--ops-space-2);
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ops-space-1);
+  border: none;
+  background: none;
+  padding: var(--ops-space-1) 0;
+  color: var(--ops-color-blue-600);
+  font-size: var(--ops-font-size-sm);
+  font-weight: var(--ops-font-weight-medium);
+  cursor: pointer;
+}
+
+.backButton:disabled {
+  color: var(--ops-color-gray-300);
+  cursor: not-allowed;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--ops-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--ops-font-size-sm);
+  color: var(--ops-color-gray-500);
+}
+
+.crumb {
+  display: inline-flex;
+}
+
+.crumb[aria-current="page"] {
+  color: var(--ops-color-gray-900);
+  font-weight: var(--ops-font-weight-medium);
+}
+
+.crumbLink {
+  color: var(--ops-color-blue-600);
+}
+
+.separator {
+  color: var(--ops-color-gray-300);
+}

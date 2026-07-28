@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState, type ReactElement } from "rea
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { StepProgress } from "../../components/StepProgress";
+import { OperationBreadcrumb } from "../../components/OperationBreadcrumb";
 import { DisabledReason } from "../../components/DisabledReason";
 import { StatusBadge } from "../../components/StatusBadge";
 import { OPERATION_STEPS } from "../../app/router";
@@ -184,6 +185,7 @@ export function ExecuteScreen(): ReactElement {
 
   return (
     <div>
+      <OperationBreadcrumb operationId={operationId} currentStepId="execute" />
       <h1 className="ops-page-title">Test Operations</h1>
       <StepProgress steps={OPERATION_STEPS} currentStepId="execute" />
 
