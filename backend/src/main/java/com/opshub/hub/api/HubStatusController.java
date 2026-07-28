@@ -28,19 +28,19 @@ public class HubStatusController {
         return hubQueryService.listHubs().stream().map(HubResponse::from).toList();
     }
 
-    public record HubResponse(
-            UUID id,
-            String name,
-            String connectionStatus,
-            String transport,
-            String platform,
-            boolean deviceReady,
-            boolean runnerReady,
-            Instant lastHeartbeatAt,
-            Instant createdAt) {
+    public record HubResponse(UUID id, String name, Instant createdAt, List<PlatformResponse> platforms) {
         static HubResponse from(HubQueryService.HubSummary hub) {
-            return new HubResponse(hub.id(), hub.name(), hub.connectionStatus(), hub.transport(), hub.platform(),
-                    hub.deviceReady(), hub.runnerReady(), hub.lastHeartbeatAt(), hub.createdAt());
+            return new HubResponse(hub.id(), hub.name(), hub.createdAt(),
+                    hub.platforms().stream().map(PlatformResponse::from).toList());
+        }
+    }
+
+    public record PlatformResponse(
+            String platform, String connectionStatus, String transport,
+            boolean deviceReady, boolean runnerReady, Instant lastHeartbeatAt) {
+        static PlatformResponse from(HubQueryService.PlatformStatus status) {
+            return new PlatformResponse(status.platform(), status.connectionStatus(), status.transport(),
+                    status.deviceReady(), status.runnerReady(), status.lastHeartbeatAt());
         }
     }
 }

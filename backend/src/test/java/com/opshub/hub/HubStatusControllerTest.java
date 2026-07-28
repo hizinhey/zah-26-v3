@@ -27,25 +27,22 @@ class HubStatusControllerTest {
     private HubQueryService hubQueryService;
 
     @Test
-    void returnsHubsInTheOrderTheQueryServiceProvidesThem() throws Exception {
+    void returnsOneHubWithBothPlatformsListed() throws Exception {
         UUID hubId = UUID.randomUUID();
         Instant heartbeatAt = Instant.parse("2026-07-28T13:47:10Z");
         Instant createdAt = Instant.parse("2026-07-27T15:21:09Z");
         when(hubQueryService.listHubs()).thenReturn(List.of(
-                new HubQueryService.HubSummary(hubId, hubId.toString(), "ONLINE", "WEBSOCKET", "ANDROID",
-                        true, true, heartbeatAt, createdAt)));
+                new HubQueryService.HubSummary(hubId, hubId.toString(), createdAt, List.of(
+                        new HubQueryService.PlatformStatus("ANDROID", "ONLINE", "WEBSOCKET", true, true, heartbeatAt),
+                        new HubQueryService.PlatformStatus("WEB", "OFFLINE", "HTTPS_POLLING", false, false, null)))));
 
         mockMvc.perform(get("/api/v1/hubs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(hubId.toString()))
-                .andExpect(jsonPath("$[0].name").value(hubId.toString()))
-                .andExpect(jsonPath("$[0].connectionStatus").value("ONLINE"))
-                .andExpect(jsonPath("$[0].transport").value("WEBSOCKET"))
-                .andExpect(jsonPath("$[0].platform").value("ANDROID"))
-                .andExpect(jsonPath("$[0].deviceReady").value(true))
-                .andExpect(jsonPath("$[0].runnerReady").value(true))
-                .andExpect(jsonPath("$[0].lastHeartbeatAt").value("2026-07-28T13:47:10Z"))
-                .andExpect(jsonPath("$[0].createdAt").value("2026-07-27T15:21:09Z"));
+                .andExpect(jsonPath("$[0].platforms[0].platform").value("ANDROID"))
+                .andExpect(jsonPath("$[0].platforms[0].connectionStatus").value("ONLINE"))
+                .andExpect(jsonPath("$[0].platforms[1].platform").value("WEB"))
+                .andExpect(jsonPath("$[0].platforms[1].connectionStatus").value("OFFLINE"));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.opshub.hub;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opshub.execution.application.ExecutionDto;
 import com.opshub.execution.application.ExecutionService;
+import com.opshub.hub.api.HubStatusController;
 import com.opshub.hub.domain.HubEnvelopeV1;
 import com.opshub.hub.domain.HubPayloads;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -26,6 +28,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -236,6 +239,48 @@ class HubProtocolIT {
                 "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
                 HttpMethod.GET, new HttpEntity<>(webHeaders), HubEnvelopeV1.class, port, hubId);
         assertThat(webOffer.getStatusCode().value()).isEqualTo(200);
+    }
+
+    // Exercises HubQueryService.listHubs()'s real hubs/hub_platforms LEFT JOIN against a real
+    // Postgres (Task 5) rather than a Mockito-stubbed JdbcTemplate - the prior single-value-column
+    // query would have compiled against a mock but thrown at runtime against the actual schema.
+    @Test
+    void hubStatusEndpointGroupsBothPlatformsUnderTheOneHubAfterBothConnect() throws Exception {
+        UUID androidOperationId = createApprovedOperation("MOB-822");
+        executionService.start(androidOperationId, 1, "status-android-" + UUID.randomUUID());
+        UUID webOperationId = createApprovedWebOperation("MOB-823");
+        executionService.start(webOperationId, 1, "status-web-" + UUID.randomUUID());
+        UUID hubId = UUID.randomUUID();
+
+        HttpHeaders androidHeaders = new HttpHeaders();
+        androidHeaders.set("X-Hub-Token", TOKEN);
+        androidHeaders.set("X-Hub-Platform", "ANDROID");
+        assertThat(restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(androidHeaders), HubEnvelopeV1.class, port, hubId)
+                .getStatusCode().value()).isEqualTo(200);
+
+        HttpHeaders webHeaders = new HttpHeaders();
+        webHeaders.set("X-Hub-Token", TOKEN);
+        webHeaders.set("X-Hub-Platform", "WEB");
+        assertThat(restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(webHeaders), HubEnvelopeV1.class, port, hubId)
+                .getStatusCode().value()).isEqualTo(200);
+
+        ResponseEntity<List<HubStatusController.HubResponse>> statusResponse = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs", HttpMethod.GET, HttpEntity.EMPTY,
+                new ParameterizedTypeReference<List<HubStatusController.HubResponse>>() { }, port);
+
+        assertThat(statusResponse.getStatusCode().value()).isEqualTo(200);
+        HubStatusController.HubResponse hub = statusResponse.getBody().stream()
+                .filter(h -> h.id().equals(hubId)).findFirst().orElseThrow();
+        assertThat(hub.platforms()).hasSize(2);
+        assertThat(hub.platforms().stream().map(HubStatusController.PlatformResponse::platform))
+                .containsExactlyInAnyOrder("ANDROID", "WEB");
+        HubStatusController.PlatformResponse android = hub.platforms().stream()
+                .filter(p -> p.platform().equals("ANDROID")).findFirst().orElseThrow();
+        assertThat(android.connectionStatus()).isEqualTo("ONLINE");
     }
 
     private UUID createApprovedWebOperation(String jiraId) {

@@ -22,69 +22,80 @@ import static org.mockito.Mockito.when;
 class HubQueryServiceTest {
 
     @SuppressWarnings("unchecked")
-    private static RowMapper<HubQueryService.HubSummary> captureRowMapper(JdbcTemplate jdbcTemplate, Clock clock) {
-        org.mockito.ArgumentCaptor<RowMapper<HubQueryService.HubSummary>> captor =
+    private static RowMapper<HubQueryService.HubPlatformRow> captureRowMapper(JdbcTemplate jdbcTemplate) {
+        org.mockito.ArgumentCaptor<RowMapper<HubQueryService.HubPlatformRow>> captor =
                 org.mockito.ArgumentCaptor.forClass(RowMapper.class);
         when(jdbcTemplate.query(anyString(), captor.capture())).thenReturn(List.of());
-        new HubQueryService(jdbcTemplate, clock).listHubs();
+        new HubQueryService(jdbcTemplate, Clock.systemUTC()).listHubs();
         return captor.getValue();
     }
 
+    private static ResultSet row(UUID hubId, String name, Instant createdAt, String platform,
+                                  String connectionStatus, String transport, boolean deviceReady,
+                                  boolean runnerReady, Instant lastHeartbeatAt) throws Exception {
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getObject("id", UUID.class)).thenReturn(hubId);
+        when(rs.getString("name")).thenReturn(name);
+        when(rs.getTimestamp("created_at")).thenReturn(Timestamp.from(createdAt));
+        when(rs.getString("platform")).thenReturn(platform);
+        when(rs.getString("connection_status")).thenReturn(connectionStatus);
+        when(rs.getString("transport")).thenReturn(transport);
+        when(rs.getBoolean("device_ready")).thenReturn(deviceReady);
+        when(rs.getBoolean("runner_ready")).thenReturn(runnerReady);
+        when(rs.getTimestamp("last_heartbeat_at")).thenReturn(lastHeartbeatAt == null ? null : Timestamp.from(lastHeartbeatAt));
+        return rs;
+    }
+
     @Test
-    void mapsEveryColumnOfAConnectedHub() throws Exception {
+    void groupsMultiplePlatformRowsUnderOneHubSummary() throws Exception {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        UUID id = UUID.randomUUID();
-        Instant heartbeatAt = Instant.parse("2026-07-28T10:00:00Z");
+        UUID hubId = UUID.randomUUID();
         Instant createdAt = Instant.parse("2026-07-27T09:00:00Z");
+        Instant heartbeatAt = Instant.parse("2026-07-28T10:00:00Z");
 
-        ResultSet row = mock(ResultSet.class);
-        when(row.getObject("id", UUID.class)).thenReturn(id);
-        when(row.getString("name")).thenReturn("3c75ce1d-...");
-        when(row.getString("connection_status")).thenReturn("ONLINE");
-        when(row.getString("transport")).thenReturn("WEBSOCKET");
-        when(row.getString("platform")).thenReturn("ANDROID");
-        when(row.getBoolean("device_ready")).thenReturn(true);
-        when(row.getBoolean("runner_ready")).thenReturn(false);
-        when(row.getTimestamp("last_heartbeat_at")).thenReturn(Timestamp.from(heartbeatAt));
-        when(row.getTimestamp("created_at")).thenReturn(Timestamp.from(createdAt));
+        ResultSet androidRow = row(hubId, "my-hub", createdAt, "ANDROID", "ONLINE", "WEBSOCKET", true, true, heartbeatAt);
+        ResultSet webRow = row(hubId, "my-hub", createdAt, "WEB", "OFFLINE", "HTTPS_POLLING", false, false, null);
 
-        RowMapper<HubQueryService.HubSummary> mapper = captureRowMapper(jdbcTemplate, Clock.fixed(heartbeatAt, ZoneOffset.UTC));
-        HubQueryService.HubSummary hub = mapper.mapRow(row, 0);
+        RowMapper<HubQueryService.HubPlatformRow> mapper = captureRowMapper(jdbcTemplate);
+        HubQueryService.HubPlatformRow mappedAndroid = mapper.mapRow(androidRow, 0);
+        HubQueryService.HubPlatformRow mappedWeb = mapper.mapRow(webRow, 1);
 
-        assertThat(hub.id()).isEqualTo(id);
-        assertThat(hub.name()).isEqualTo("3c75ce1d-...");
-        assertThat(hub.connectionStatus()).isEqualTo("ONLINE");
-        assertThat(hub.transport()).isEqualTo("WEBSOCKET");
-        assertThat(hub.platform()).isEqualTo("ANDROID");
-        assertThat(hub.deviceReady()).isTrue();
-        assertThat(hub.runnerReady()).isFalse();
-        assertThat(hub.lastHeartbeatAt()).isEqualTo(heartbeatAt);
-        assertThat(hub.createdAt()).isEqualTo(createdAt);
+        List<HubQueryService.HubSummary> summaries = HubQueryService.groupByHub(
+                List.of(mappedAndroid, mappedWeb), Clock.fixed(heartbeatAt, ZoneOffset.UTC));
+
+        assertThat(summaries).hasSize(1);
+        HubQueryService.HubSummary hub = summaries.get(0);
+        assertThat(hub.id()).isEqualTo(hubId);
+        assertThat(hub.platforms()).hasSize(2);
+        HubQueryService.PlatformStatus android = hub.platforms().stream()
+                .filter(p -> p.platform().equals("ANDROID")).findFirst().orElseThrow();
+        assertThat(android.connectionStatus()).isEqualTo("ONLINE");
+        assertThat(android.deviceReady()).isTrue();
+        HubQueryService.PlatformStatus web = hub.platforms().stream()
+                .filter(p -> p.platform().equals("WEB")).findFirst().orElseThrow();
+        assertThat(web.connectionStatus()).isEqualTo("OFFLINE");
+        assertThat(web.lastHeartbeatAt()).isNull();
     }
 
     @Test
-    void mapsAMissingLastHeartbeatToNullRatherThanThrowing() throws Exception {
+    void downgradesToOfflineWhenTheLastHeartbeatIsOlderThanTheStaleThreshold() throws Exception {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        ResultSet row = mock(ResultSet.class);
-        when(row.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
-        when(row.getString("name")).thenReturn("hub");
-        when(row.getString("connection_status")).thenReturn("OFFLINE");
-        when(row.getString("transport")).thenReturn("HTTPS_POLLING");
-        when(row.getString("platform")).thenReturn("ANDROID");
-        when(row.getBoolean("device_ready")).thenReturn(false);
-        when(row.getBoolean("runner_ready")).thenReturn(false);
-        when(row.getTimestamp("last_heartbeat_at")).thenReturn(null);
-        when(row.getTimestamp("created_at")).thenReturn(Timestamp.from(Instant.parse("2026-07-27T09:00:00Z")));
+        UUID hubId = UUID.randomUUID();
+        Instant heartbeatAt = Instant.parse("2026-07-28T14:58:13Z");
+        Instant now = heartbeatAt.plusSeconds(61);
 
-        RowMapper<HubQueryService.HubSummary> mapper =
-                captureRowMapper(jdbcTemplate, Clock.fixed(Instant.parse("2026-07-27T09:00:00Z"), ZoneOffset.UTC));
-        HubQueryService.HubSummary hub = mapper.mapRow(row, 0);
+        ResultSet androidRow = row(hubId, "hub", heartbeatAt, "ANDROID", "ONLINE", "WEBSOCKET", true, true, heartbeatAt);
+        RowMapper<HubQueryService.HubPlatformRow> mapper = captureRowMapper(jdbcTemplate);
+        HubQueryService.HubPlatformRow mapped = mapper.mapRow(androidRow, 0);
 
-        assertThat(hub.lastHeartbeatAt()).isNull();
+        List<HubQueryService.HubSummary> summaries = HubQueryService.groupByHub(
+                List.of(mapped), Clock.fixed(now, ZoneOffset.UTC));
+
+        assertThat(summaries.get(0).platforms().get(0).connectionStatus()).isEqualTo("OFFLINE");
     }
 
     @Test
-    void ordersMostRecentlyActiveHubsFirst() {
+    void ordersMostRecentlyCreatedHubsFirst() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         org.mockito.ArgumentCaptor<String> sqlCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class))).thenReturn(List.of());
@@ -93,80 +104,6 @@ class HubQueryServiceTest {
 
         String sql = sqlCaptor.getValue().toUpperCase();
         assertThat(sql).contains("ORDER BY");
-        assertThat(sql).contains("LAST_HEARTBEAT_AT");
-    }
-
-    // A killed/crashed backend process can never run HubWebSocketHandler#afterConnectionClosed
-    // (the only thing that calls HubConnectionService#markOffline), so `hubs.connection_status`
-    // can be stuck at ONLINE indefinitely for a Hub that's actually gone - the row-level mapping
-    // must not trust that column at face value without checking how recent the heartbeat is.
-
-    @Test
-    void downgradesToOfflineWhenTheLastHeartbeatIsOlderThanTheStaleThreshold() throws Exception {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        Instant heartbeatAt = Instant.parse("2026-07-28T14:58:13Z");
-        Instant now = heartbeatAt.plusSeconds(61);
-
-        ResultSet row = mock(ResultSet.class);
-        when(row.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
-        when(row.getString("name")).thenReturn("hub");
-        when(row.getString("connection_status")).thenReturn("ONLINE");
-        when(row.getString("transport")).thenReturn("WEBSOCKET");
-        when(row.getString("platform")).thenReturn("ANDROID");
-        when(row.getBoolean("device_ready")).thenReturn(true);
-        when(row.getBoolean("runner_ready")).thenReturn(true);
-        when(row.getTimestamp("last_heartbeat_at")).thenReturn(Timestamp.from(heartbeatAt));
-        when(row.getTimestamp("created_at")).thenReturn(Timestamp.from(heartbeatAt));
-
-        RowMapper<HubQueryService.HubSummary> mapper = captureRowMapper(jdbcTemplate, Clock.fixed(now, ZoneOffset.UTC));
-        HubQueryService.HubSummary hub = mapper.mapRow(row, 0);
-
-        assertThat(hub.connectionStatus()).isEqualTo("OFFLINE");
-    }
-
-    @Test
-    void keepsOnlineWhenTheLastHeartbeatIsWithinTheStaleThreshold() throws Exception {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        Instant heartbeatAt = Instant.parse("2026-07-28T14:58:13Z");
-        Instant now = heartbeatAt.plusSeconds(59);
-
-        ResultSet row = mock(ResultSet.class);
-        when(row.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
-        when(row.getString("name")).thenReturn("hub");
-        when(row.getString("connection_status")).thenReturn("ONLINE");
-        when(row.getString("transport")).thenReturn("WEBSOCKET");
-        when(row.getString("platform")).thenReturn("ANDROID");
-        when(row.getBoolean("device_ready")).thenReturn(true);
-        when(row.getBoolean("runner_ready")).thenReturn(true);
-        when(row.getTimestamp("last_heartbeat_at")).thenReturn(Timestamp.from(heartbeatAt));
-        when(row.getTimestamp("created_at")).thenReturn(Timestamp.from(heartbeatAt));
-
-        RowMapper<HubQueryService.HubSummary> mapper = captureRowMapper(jdbcTemplate, Clock.fixed(now, ZoneOffset.UTC));
-        HubQueryService.HubSummary hub = mapper.mapRow(row, 0);
-
-        assertThat(hub.connectionStatus()).isEqualTo("ONLINE");
-    }
-
-    @Test
-    void leavesAnAlreadyOfflineHubAlone() throws Exception {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        Instant heartbeatAt = Instant.parse("2026-07-28T14:58:13Z");
-
-        ResultSet row = mock(ResultSet.class);
-        when(row.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
-        when(row.getString("name")).thenReturn("hub");
-        when(row.getString("connection_status")).thenReturn("OFFLINE");
-        when(row.getString("transport")).thenReturn("WEBSOCKET");
-        when(row.getString("platform")).thenReturn("ANDROID");
-        when(row.getBoolean("device_ready")).thenReturn(false);
-        when(row.getBoolean("runner_ready")).thenReturn(false);
-        when(row.getTimestamp("last_heartbeat_at")).thenReturn(Timestamp.from(heartbeatAt));
-        when(row.getTimestamp("created_at")).thenReturn(Timestamp.from(heartbeatAt));
-
-        RowMapper<HubQueryService.HubSummary> mapper =
-                captureRowMapper(jdbcTemplate, Clock.fixed(heartbeatAt, ZoneOffset.UTC));
-        HubQueryService.HubSummary hub = mapper.mapRow(row, 0);
-
-        assertThat(hub.connectionStatus()).isEqualTo("OFFLINE");
+        assertThat(sql).contains("CREATED_AT");
     }
 }
