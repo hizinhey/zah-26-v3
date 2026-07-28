@@ -85,7 +85,46 @@ curl -fsS http://127.0.0.1:4723/status        # Appium status
 adb shell pm list packages com.zing.zalo      # Zalo installed
 ```
 
-## 4. Starting Appium
+## 4. Web (Zalo Web) platform
+
+The Web execution path drives `chat.zalo.me` in desktop Chrome via
+WebdriverIO — no Appium, no adb, no mobile device. The backend spawns this
+worker itself (`opshub.web-worker.*` properties in `application.yml`/env,
+disabled by default) rather than it running as an always-on service.
+
+One-time setup on the host that will run it:
+
+1. Provision a Node project containing `wdio.web.conf.ts` at its root,
+   alongside the existing `wdio.conf.ts` used for Android (same
+   `node_modules`/`package.json`, WebdriverIO v9 manages its own matching
+   chromedriver — no separate driver install needed). `wdio.web.conf.ts`
+   needs a plain `browserName: 'chrome'` capability with
+   `'goog:chromeOptions': { args: ['--user-data-dir=<profile-dir>'] } }`,
+   `maxInstances: 1`, and an `afterTest` hook that writes
+   `await browser.saveScreenshot('./evidence/last-screenshot.png')` after
+   every test (creating the `evidence/` directory first if it doesn't
+   exist) — this is how `WebScreenshotCapturer`
+   (`local-hub/src/opshub_hub/browser_control.py`) picks up each test's
+   evidence.
+2. Open that Chrome profile once manually and scan the Zalo QR login code
+   with a dedicated test account's phone. The profile directory now stays
+   signed in across runs; point `opshub.web-worker.data-root`'s
+   `chrome-profile` subdirectory (or whichever path `wdio.web.conf.ts`'s
+   `--user-data-dir` uses) at it.
+3. Set `opshub.web-worker.enabled=true` and the rest of the
+   `opshub.web-worker.*` properties (`python-executable`,
+   `working-directory` — the Local Hub checkout with its Python venv
+   already installed — `hub-id`, `backend-url`, `template-root` pointing
+   at `local-hub/templates/web`, `data-root`) on the backend.
+
+Unlike Android, this Hub isn't started manually or kept running — the
+backend launches it (`WebWorkerLauncher`) the first time an operator starts
+an execution against a `WEB`-platform Operation, and it exits once that
+job completes. Sequential only: a second Web execution can't start while
+one is already running, the same way a second execution against a
+busy/leased Hub is rejected today.
+
+## 5. Starting Appium
 
 The Hub does not start Appium itself — start it separately on the same host
 before starting the Hub (or before it next needs to run a job):
@@ -100,7 +139,7 @@ Confirm it is reachable with the preflight check above, or directly:
 curl -fsS http://127.0.0.1:4723/status
 ```
 
-## 5. Transport status (WebSocket vs. polling fallback)
+## 6. Transport status (WebSocket vs. polling fallback)
 
 The Hub prefers the WebSocket transport (`ws://…/ws/v1/hubs/{hubId}`) and
 automatically fails over to HTTPS long-polling (`GET …/jobs/next`) after
@@ -133,7 +172,7 @@ intentionally scoped-down minor from Task 11, not a defect — the Execute
 screen shows "Connecting to live updates…" then "Live updates
 disconnected — refreshing periodically." once the fallback engages.
 
-## 6. Evidence cleanup
+## 7. Evidence cleanup
 
 Evidence (screenshots, logs) is written locally under
 `OPSHUB_WORK_DIR/<executionId>/evidence/` before being uploaded to the
@@ -157,7 +196,7 @@ bind mount (`/opt/opshub/data/evidence` in the Rocky Linux deployment, see
 `docs/deployment/rocky-linux-9.md`) — cleanup there is a backend/operator
 concern, not the Hub's.
 
-## 7. Database backup
+## 8. Database backup
 
 Backups are a backend/deployment concern (the Hub itself is stateless
 except for its local Outbox/journal). See
@@ -174,7 +213,7 @@ if you need to preserve in-flight, not-yet-flushed envelopes across a Hub
 host migration — under normal operation it drains automatically and does
 not need routine backup.
 
-## 8. Service restart
+## 9. Service restart
 
 Restarting the Hub process is always safe: the Outbox durably persists any
 envelope that could not be sent, and replays it on the next successful
@@ -195,7 +234,7 @@ Restarting the backend/gateway/database stack is documented in
 after a `build`, or `docker compose restart <service>` for a single
 service without rebuilding).
 
-## 9. Common recovery commands
+## 10. Common recovery commands
 
 | Symptom | Command | Notes |
 |---|---|---|
