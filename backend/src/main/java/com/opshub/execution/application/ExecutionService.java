@@ -354,8 +354,15 @@ public class ExecutionService {
                     }
                 }, execution.planId());
 
+        String platform = jdbcTemplate.queryForObject("""
+                        SELECT DISTINCT oa.platform
+                        FROM official_accounts oa
+                        JOIN test_plans plan ON plan.operation_id = oa.operation_id
+                        WHERE plan.id = ?
+                        """, String.class, execution.planId());
+
         HubPayloads.JobOfferedPayload payload = new HubPayloads.JobOfferedPayload(
-                executionId, execution.idempotencyKey(), execution.sourceRevision(), "ANDROID", testCases, leaseToken);
+                executionId, execution.idempotencyKey(), execution.sourceRevision(), platform, testCases, leaseToken);
         return HubEnvelopeV1.of(HubEnvelopeV1.TYPE_JOB_OFFERED, payload);
     }
 

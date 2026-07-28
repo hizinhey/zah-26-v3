@@ -110,6 +110,21 @@ class ExecutionServiceTest {
         assertThat(secondOffer).isEmpty();
     }
 
+    @Test
+    void reportsTheOperationsActualPlatformInTheJobOfferedPayload() {
+        UUID operationId = createDraftOperation("MOB-607");
+        approvePlan(operationId, 1, "WEB");
+        executionService.start(operationId, 1, "key-web-platform");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+
+        assertThat(offer).isPresent();
+        HubPayloads.JobOfferedPayload payload = (HubPayloads.JobOfferedPayload) offer.get().payload();
+        assertThat(payload.platform()).isEqualTo("WEB");
+    }
+
     /**
      * Regression coverage for a review finding on the first cut of this test: it queried
      * {@code lease_token} straight out of the DB and called {@code executionService.renewLease(...)}
@@ -318,14 +333,18 @@ class ExecutionServiceTest {
     }
 
     private UUID approvePlan(UUID operationId, int revision) {
+        return approvePlan(operationId, revision, "ANDROID");
+    }
+
+    private UUID approvePlan(UUID operationId, int revision, String platform) {
         UUID planId = UUID.randomUUID();
         // buildJobOfferedEnvelope joins test_cases -> official_accounts on (operation_id,
         // oa_order) to populate the C1 oaOrder/oaName fields, so a row here is required for
         // offerNextJob to return any test cases at all.
         jdbcTemplate.update("""
                         INSERT INTO official_accounts (id, operation_id, oa_order, platform, oa_name, thumbnail_url, content, button_text, redirect_url)
-                        VALUES (?, ?, 1, 'ANDROID', 'Test OA', 'https://example.test/thumb.png', 'content', 'Open', 'https://example.test/redirect')
-                        """, UUID.randomUUID(), operationId);
+                        VALUES (?, ?, 1, ?, 'Test OA', 'https://example.test/thumb.png', 'content', 'Open', 'https://example.test/redirect')
+                        """, UUID.randomUUID(), operationId, platform);
         jdbcTemplate.update("""
                         INSERT INTO test_plans (id, operation_id, source_revision, template_catalog_version, status, approval_status)
                         VALUES (?, ?, ?, 'catalog-v1', 'READY', 'APPROVED')
