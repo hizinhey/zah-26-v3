@@ -17,7 +17,7 @@ from opshub_hub.main import build_web_runner
 from opshub_hub.outbox import Outbox
 from opshub_hub.transport.failover import FailoverTransport
 
-TEMPLATE_ROOT = Path(__file__).resolve().parents[1] / "templates" / "android"
+TEMPLATE_ROOT = Path(__file__).resolve().parents[1] / "templates"
 
 
 class _FakeTransport:
@@ -105,9 +105,9 @@ def test_build_web_runner_uses_the_pinned_wdio_web_conf_and_screenshot_capturer(
         backend_url="https://backend.example.test",
         hub_id="hub-1",
         hub_token="token",
-        template_root=Path(__file__).resolve().parents[1] / "templates" / "web",
+        template_root=Path(__file__).resolve().parents[1] / "templates",
         data_root=tmp_path,
-        platform="WEB",
+        platforms=("WEB",),
         wdio_project_root=wdio_project_root,
         node_executable=Path("/usr/bin/node"),
     )
@@ -130,3 +130,26 @@ def test_build_web_runner_uses_the_pinned_wdio_web_conf_and_screenshot_capturer(
     assert str(wdio_project_root / "node_modules" / ".bin" / "wdio") in command
     assert "wdio.web.conf.ts" in command
     assert "npx" not in command
+
+
+def test_run_platform_logs_and_returns_without_raising_when_preflight_fails(tmp_path, caplog):
+    from opshub_hub.main import _run_platform
+
+    config = HubConfig(
+        backend_url="https://backend.example.test",
+        hub_id="hub-1",
+        hub_token="token",
+        template_root=tmp_path / "nonexistent-templates",
+        data_root=tmp_path,
+        platforms=("ANDROID",),
+        wdio_project_root=tmp_path / "nonexistent-wdio-project",
+        node_executable=Path("/usr/bin/node"),
+    )
+
+    with caplog.at_level("ERROR"):
+        _run_platform(config, "ANDROID")
+
+    assert any("Preflight" in record.message for record in caplog.records), (
+        "a failed preflight must log and return, not raise - one platform's broken environment "
+        "must not crash the whole multi-platform Hub process"
+    )

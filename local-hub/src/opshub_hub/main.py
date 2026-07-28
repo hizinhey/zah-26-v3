@@ -1,5 +1,6 @@
 """Local Hub entrypoint: wires config, transports, journal, outbox, template
-catalog, and the Runner together, then loops receiving and executing jobs.
+catalog, and the Runner together for each configured platform, running them
+concurrently - one thread per platform, each fully isolated from the others.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ logger = logging.getLogger("opshub_hub")
 
 
 def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox) -> Runner:
-    catalog = TemplateCatalog(config.template_root)
+    catalog = TemplateCatalog(config.platform_template_root("ANDROID"))
     execution_root = config.data_root / "executions"
     evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url, hub_token=config.hub_token)
     # C3 fix: wire real screenshot capture (device-level, via `adb exec-out screencap`) and a
@@ -64,7 +65,7 @@ def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox
 
 
 def build_web_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox) -> Runner:
-    catalog = TemplateCatalog(config.template_root)
+    catalog = TemplateCatalog(config.platform_template_root("WEB"))
     execution_root = config.data_root / "executions"
     evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url, hub_token=config.hub_token)
     # Mirrors build_runner's Node-version fix exactly, just against wdio.web.conf.ts instead of
@@ -148,44 +149,59 @@ def _heartbeat_while_running(transport: FailoverTransport, interval: float = HEA
         thread.join(timeout=interval)
 
 
-def run_forever(config: HubConfig | None = None) -> None:
-    config = config or load_config()
+def _run_platform(config: HubConfig, platform: str) -> None:
+    """Runs one platform's full preflight-connect-loop pipeline to completion (or until the
+    process is killed). Isolated per platform: a failure here does not affect any other
+    platform thread running in the same process."""
+    try:
+        if platform == "WEB":
+            chrome_profile_dir = config.data_root / "chrome-profile"
+            preflight = run_web_preflight(
+                template_root=config.platform_template_root("WEB"),
+                data_root=config.data_root,
+                chrome_profile_dir=chrome_profile_dir,
+                # Same reasoning as the ANDROID branch below: check the pinned Node executable
+                # itself, not whatever "node" resolves to on PATH.
+                required_executables=(str(config.node_executable),),
+                wdio_project_root=config.wdio_project_root,
+            )
+        else:
+            preflight = run_preflight(
+                template_root=config.platform_template_root("ANDROID"),
+                data_root=config.data_root,
+                # Check the pinned Node executable itself (not whatever "node" resolves to on PATH -
+                # see build_runner's command_builder comment for why that distinction matters) and that
+                # the pinned WebdriverIO project actually has its CLI installed.
+                required_executables=(str(config.node_executable), "adb"),
+                wdio_project_root=config.wdio_project_root,
+            )
+    except Exception:
+        # run_preflight/run_web_preflight only turn a *missing template checksum* into a graceful
+        # CheckResult (TemplateIntegrityError) - a template_root that doesn't exist at all raises
+        # FileNotFoundError straight out of TemplateCatalog's constructor instead. Either way, one
+        # platform's broken environment must degrade to "this platform doesn't start" rather than
+        # taking down the whole multi-platform process (and the other platforms' threads with it).
+        logger.exception(
+            "[%s] Preflight raised an unexpected error; this platform will not run in this Hub process.",
+            platform,
+        )
+        return
 
-    if config.platform == "WEB":
-        chrome_profile_dir = config.data_root / "chrome-profile"
-        preflight = run_web_preflight(
-            template_root=config.template_root,
-            data_root=config.data_root,
-            chrome_profile_dir=chrome_profile_dir,
-            # Same reasoning as the ANDROID branch below: check the pinned Node executable
-            # itself, not whatever "node" resolves to on PATH.
-            required_executables=(str(config.node_executable),),
-            wdio_project_root=config.wdio_project_root,
-        )
-    else:
-        preflight = run_preflight(
-            template_root=config.template_root,
-            data_root=config.data_root,
-            # Check the pinned Node executable itself (not whatever "node" resolves to on PATH -
-            # see build_runner's command_builder comment for why that distinction matters) and that
-            # the pinned WebdriverIO project actually has its CLI installed.
-            required_executables=(str(config.node_executable), "adb"),
-            wdio_project_root=config.wdio_project_root,
-        )
     if not preflight.ok:
         for failure in preflight.failures():
-            logger.error("Preflight check failed: %s (%s)", failure.name, failure.detail)
-        raise SystemExit("Preflight checks failed; refusing to start the Local Hub.")
+            logger.error("[%s] Preflight check failed: %s (%s)", platform, failure.name, failure.detail)
+        logger.error("[%s] Preflight checks failed; this platform will not run in this Hub process.", platform)
+        return
 
-    journal = ExecutionJournal(config.data_root / "journal.sqlite3")
-    outbox = Outbox(config.data_root / "outbox.sqlite3")
+    journal = ExecutionJournal(config.data_root / f"journal-{platform.lower()}.sqlite3")
+    outbox = Outbox(config.data_root / f"outbox-{platform.lower()}.sqlite3")
     transport = FailoverTransport(
-        ws_transport=WebSocketTransport(config),
-        polling_transport=PollingTransport(config),
+        ws_transport=WebSocketTransport(config, platform),
+        polling_transport=PollingTransport(config, platform),
     )
     transport.ws_transport.connect()
 
-    runner = build_web_runner(config, transport, outbox) if config.platform == "WEB" else build_runner(config, transport, outbox)
+    runner = build_web_runner(config, transport, outbox) if platform == "WEB" else build_runner(config, transport, outbox)
 
     while True:
         outbox.flush(transport)
@@ -197,13 +213,32 @@ def run_forever(config: HubConfig | None = None) -> None:
         try:
             payload = JobOfferedPayload.model_validate(job.get("payload", job))
         except Exception:
-            logger.exception("Rejected an invalid JOB_OFFERED payload from the backend; skipping it.")
+            logger.exception("[%s] Rejected an invalid JOB_OFFERED payload from the backend; skipping it.", platform)
             continue
         if not journal.claim(str(payload.executionId), payload.idempotencyKey):
             continue
         with _heartbeat_while_running(transport):
             runner.run(payload)
         journal.complete(str(payload.executionId))
+
+
+def run_forever(config: HubConfig | None = None) -> None:
+    config = config or load_config()
+
+    # De-duplicate: config.platforms doesn't guarantee uniqueness (e.g. "ANDROID,ANDROID" is
+    # accepted as-is by load_config), and spawning two threads for the same platform would mean
+    # two runners racing over the same journal/outbox sqlite files and the same transport
+    # connection for that platform. dict.fromkeys preserves first-seen order.
+    platforms = tuple(dict.fromkeys(config.platforms))
+
+    threads = [
+        threading.Thread(target=_run_platform, args=(config, platform), name=f"opshub-hub-{platform.lower()}", daemon=False)
+        for platform in platforms
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
 
 if __name__ == "__main__":
