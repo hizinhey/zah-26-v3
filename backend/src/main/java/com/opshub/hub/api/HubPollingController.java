@@ -51,9 +51,11 @@ public class HubPollingController {
     @GetMapping("/jobs/next")
     public ResponseEntity<HubEnvelopeV1> next(@PathVariable UUID hubId,
                                                @RequestParam(defaultValue = "25") long waitSeconds,
-                                               @RequestHeader("X-Hub-Token") String token) throws InterruptedException {
+                                               @RequestHeader("X-Hub-Token") String token,
+                                               @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String platform)
+            throws InterruptedException {
         requireValidToken(token);
-        hubConnectionService.markOnline(hubId, "HTTPS_POLLING");
+        hubConnectionService.markOnline(hubId, "HTTPS_POLLING", platform);
         long capped = Math.min(waitSeconds, hubProperties.getPollWaitCapSeconds());
         Instant deadline = Instant.now().plusSeconds(capped);
         do {
@@ -68,11 +70,12 @@ public class HubPollingController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat(@PathVariable UUID hubId, @RequestHeader("X-Hub-Token") String token,
+                                           @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String platform,
                                            @RequestBody HubEnvelopeV1 envelope) {
         requireValidToken(token);
         var payload = new com.fasterxml.jackson.databind.ObjectMapper()
                 .convertValue(envelope.payload(), com.opshub.hub.domain.HubPayloads.HeartbeatPayload.class);
-        hubConnectionService.heartbeat(hubId, "HTTPS_POLLING", payload.deviceReady(), payload.runnerReady());
+        hubConnectionService.heartbeat(hubId, "HTTPS_POLLING", payload.deviceReady(), payload.runnerReady(), platform);
         // Same lease-renewal-on-heartbeat behavior as the WebSocket transport (see
         // HubWebSocketHandler#handleTextMessage) - looked up server-side by hub ID rather than
         // requiring the payload to carry the lease token.

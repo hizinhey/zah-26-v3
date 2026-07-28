@@ -82,21 +82,33 @@ public class LeaseService {
 
     /**
      * Executions that are queued, or whose previously granted lease has expired without a result,
-     * are eligible to be re-offered. A Hub can only ever hold one active lease at a time.
+     * and whose Operation's official accounts match the given {@code platform}, are eligible to
+     * be re-offered. A Hub can only ever hold one active lease at a time.
+     * <p>
+     * The platform filter matters: without it, an ANDROID Hub could be offered a WEB execution
+     * (and vice versa), which would crash the Hub trying to render a template id its catalog
+     * doesn't recognize. "One platform per Operation" (enforced at write time by
+     * {@code OperationService}) guarantees every official account joined here agrees on platform,
+     * so this filter never needs to disambiguate within a single execution.
      */
-    public Optional<UUID> nextOfferableExecution() {
+    public Optional<UUID> nextOfferableExecution(String platform) {
         return jdbcTemplate.queryForList("""
                         SELECT execution.id
                         FROM executions execution
+                        JOIN test_plans plan ON plan.id = execution.plan_id
                         WHERE execution.status IN ('QUEUED', 'RUNNING')
                           AND execution.finished_at IS NULL
+                          AND EXISTS (
+                              SELECT 1 FROM official_accounts oa
+                              WHERE oa.operation_id = plan.operation_id AND oa.platform = ?
+                          )
                           AND NOT EXISTS (
                               SELECT 1 FROM job_leases lease
                               WHERE lease.execution_id = execution.id AND lease.expires_at > ?
                           )
                         ORDER BY execution.queued_at ASC
                         LIMIT 1
-                        """, UUID.class, now())
+                        """, UUID.class, platform, now())
                 .stream().findFirst();
     }
 

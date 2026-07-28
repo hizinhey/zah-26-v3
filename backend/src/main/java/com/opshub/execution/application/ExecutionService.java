@@ -148,14 +148,14 @@ public class ExecutionService {
      */
     @Transactional
     public Optional<HubEnvelopeV1> offerNextJob(UUID hubId) {
-        requireHubOnline(hubId);
+        String hubPlatform = requireHubOnlineAndGetPlatform(hubId);
         ReentrantLock lock = hubLocks.computeIfAbsent(hubId, id -> new ReentrantLock());
         lock.lock();
         try {
             if (leaseService.hasActiveLease(hubId)) {
                 return Optional.empty();
             }
-            Optional<UUID> candidate = leaseService.nextOfferableExecution();
+            Optional<UUID> candidate = leaseService.nextOfferableExecution(hubPlatform);
             if (candidate.isEmpty()) {
                 return Optional.empty();
             }
@@ -332,6 +332,24 @@ public class ExecutionService {
         if (!"ONLINE".equals(status)) {
             throw new HubNotOnlineException(hubId);
         }
+    }
+
+    /**
+     * Same online check as {@link #requireHubOnline}, plus the Hub's own reported platform so
+     * {@link #offerNextJob} can restrict dispatch to executions matching it (see
+     * {@link LeaseService#nextOfferableExecution}).
+     */
+    private String requireHubOnlineAndGetPlatform(UUID hubId) {
+        HubStatusRow row = jdbcTemplate.query("SELECT connection_status, platform FROM hubs WHERE id = ?",
+                rs -> rs.next() ? new HubStatusRow(rs.getString("connection_status"), rs.getString("platform")) : null,
+                hubId);
+        if (row == null || !"ONLINE".equals(row.connectionStatus())) {
+            throw new HubNotOnlineException(hubId);
+        }
+        return row.platform();
+    }
+
+    private record HubStatusRow(String connectionStatus, String platform) {
     }
 
     private HubEnvelopeV1 buildJobOfferedEnvelope(UUID executionId, UUID leaseToken) {

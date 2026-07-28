@@ -97,7 +97,7 @@ class ExecutionServiceTest {
         approvePlan(operationId, 1);
         executionService.start(operationId, 1, "key-lease");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
         Optional<HubEnvelopeV1> firstOffer = executionService.offerNextJob(hubId);
         assertThat(firstOffer).isPresent();
@@ -116,13 +116,35 @@ class ExecutionServiceTest {
         approvePlan(operationId, 1, "WEB");
         executionService.start(operationId, 1, "key-web-platform");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "WEB");
 
         Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
 
         assertThat(offer).isPresent();
         HubPayloads.JobOfferedPayload payload = (HubPayloads.JobOfferedPayload) offer.get().payload();
         assertThat(payload.platform()).isEqualTo("WEB");
+    }
+
+    /**
+     * Critical finding from the final whole-branch review: job dispatch previously had no
+     * platform filter at all, so an ANDROID Hub could be offered a WEB execution (and crash
+     * trying to render an unknown web-* template id). Proves an ANDROID Hub is never offered a
+     * WEB-only execution, and that the WEB job remains offerable to a Hub that actually reports
+     * platform WEB.
+     */
+    @Test
+    void neverOffersAWebExecutionToAnAndroidHub() {
+        UUID operationId = createDraftOperation("MOB-612");
+        approvePlan(operationId, 1, "WEB");
+        executionService.start(operationId, 1, "key-web-not-for-android-hub");
+        UUID androidHubId = UUID.randomUUID();
+        hubConnectionService.markOnline(androidHubId, "WEBSOCKET", "ANDROID");
+
+        assertThat(executionService.offerNextJob(androidHubId)).isEmpty();
+
+        UUID webHubId = UUID.randomUUID();
+        hubConnectionService.markOnline(webHubId, "WEBSOCKET", "WEB");
+        assertThat(executionService.offerNextJob(webHubId)).isPresent();
     }
 
     /**
@@ -142,7 +164,7 @@ class ExecutionServiceTest {
         approvePlan(operationId, 1);
         executionService.start(operationId, 1, "key-renew-active");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
         Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
         assertThat(offer).isPresent();
@@ -161,7 +183,7 @@ class ExecutionServiceTest {
     @Test
     void renewActiveLeaseIsANoOpWhenTheHubHasNoLease() {
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
         assertThat(executionService.renewActiveLease(hubId)).isFalse();
     }
@@ -172,7 +194,7 @@ class ExecutionServiceTest {
         UUID planId = approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-expire");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
         Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
         assertThat(offer).isPresent();
@@ -207,7 +229,7 @@ class ExecutionServiceTest {
         UUID planId = approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-deterministic-id");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         executionService.offerNextJob(hubId);
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
@@ -256,7 +278,7 @@ class ExecutionServiceTest {
         UUID planId = approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-find-by-id");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         executionService.offerNextJob(hubId);
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
@@ -281,7 +303,7 @@ class ExecutionServiceTest {
         approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-abandoned");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         assertThat(executionService.offerNextJob(hubId)).isPresent();
 
         // Simulate a Hub that died mid-run: its lease expired long past the sweep's grace period,
@@ -302,7 +324,7 @@ class ExecutionServiceTest {
         approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-not-yet-abandoned");
         UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         assertThat(executionService.offerNextJob(hubId)).isPresent();
 
         // Lease expired a moment ago, well within the grace period - still eligible for re-offer,

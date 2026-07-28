@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class HubWebSocketHandler extends TextWebSocketHandler {
     static final String HUB_ID_ATTRIBUTE = "hubId";
+    static final String HUB_PLATFORM_ATTRIBUTE = "hubPlatform";
 
     private final ExecutionService executionService;
     private final HubConnectionService hubConnectionService;
@@ -41,7 +42,7 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         UUID hubId = hubId(session);
         sessionsByHub.put(hubId, session);
-        hubConnectionService.markOnline(hubId, "WEBSOCKET");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", platform(session));
     }
 
     @Override
@@ -58,7 +59,7 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
         switch (envelope.type()) {
             case HubEnvelopeV1.TYPE_HEARTBEAT -> {
                 HubPayloads.HeartbeatPayload payload = objectMapper.convertValue(envelope.payload(), HubPayloads.HeartbeatPayload.class);
-                hubConnectionService.heartbeat(hubId, "WEBSOCKET", payload.deviceReady(), payload.runnerReady());
+                hubConnectionService.heartbeat(hubId, "WEBSOCKET", payload.deviceReady(), payload.runnerReady(), platform(session));
                 // A heartbeat renews whichever lease the Hub currently holds, so a long-running job
                 // survives past the fixed 60s lease window without the Hub separately tracking and
                 // resending the lease token (looked up server-side by hub ID - see
@@ -84,5 +85,9 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
 
     private UUID hubId(WebSocketSession session) {
         return (UUID) session.getAttributes().get(HUB_ID_ATTRIBUTE);
+    }
+
+    private String platform(WebSocketSession session) {
+        return (String) session.getAttributes().get(HUB_PLATFORM_ATTRIBUTE);
     }
 }

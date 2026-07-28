@@ -23,7 +23,7 @@ class HubConnectionServiceTest {
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(1);
         HubConnectionService service = new HubConnectionService(jdbcTemplate);
 
-        service.heartbeat(UUID.randomUUID(), "HTTPS_POLLING", true, true);
+        service.heartbeat(UUID.randomUUID(), "HTTPS_POLLING", true, true, "ANDROID");
 
         ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).update(anyString(), arguments.capture());

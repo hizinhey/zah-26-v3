@@ -57,6 +57,7 @@ public class HubWebSocketConfig implements WebSocketConfigurer {
                 return false;
             }
             attributes.put(HubWebSocketHandler.HUB_ID_ATTRIBUTE, hubId);
+            attributes.put(HubWebSocketHandler.HUB_PLATFORM_ATTRIBUTE, extractPlatform(request));
             return true;
         }
 
@@ -73,6 +74,26 @@ public class HubWebSocketConfig implements WebSocketConfigurer {
                 return servletRequest.getServletRequest().getParameter("token");
             }
             return null;
+        }
+
+        /**
+         * Reads which platform the connecting Local Hub serves, so job dispatch can filter to
+         * only that Hub's platform - without this, an ANDROID Hub could be offered a WEB job and
+         * crash rendering an unknown template id. Defaults to ANDROID for Hubs that predate this
+         * header (every Hub before WEB support existed).
+         */
+        private String extractPlatform(ServerHttpRequest request) {
+            String header = request.getHeaders().getFirst("X-Hub-Platform");
+            if (header != null) {
+                return header;
+            }
+            if (request instanceof ServletServerHttpRequest servletRequest) {
+                String param = servletRequest.getServletRequest().getParameter("platform");
+                if (param != null) {
+                    return param;
+                }
+            }
+            return "ANDROID";
         }
 
         private UUID extractHubId(ServerHttpRequest request) {
