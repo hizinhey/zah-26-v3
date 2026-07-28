@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ExecutionService {
     private final JdbcTemplate jdbcTemplate;
     private final LeaseService leaseService;
+    private final WebWorkerLauncher webWorkerLauncher;
     private final ObjectMapper objectMapper;
 
     /** Guards against concurrent job offers racing each other for the same Hub. */
@@ -54,13 +55,14 @@ public class ExecutionService {
     );
 
     @Autowired
-    public ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService) {
-        this(jdbcTemplate, leaseService, new ObjectMapper());
+    public ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, WebWorkerLauncher webWorkerLauncher) {
+        this(jdbcTemplate, leaseService, webWorkerLauncher, new ObjectMapper());
     }
 
-    ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, ObjectMapper objectMapper) {
+    ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, WebWorkerLauncher webWorkerLauncher, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.leaseService = leaseService;
+        this.webWorkerLauncher = webWorkerLauncher;
         this.objectMapper = objectMapper;
     }
 
@@ -97,6 +99,11 @@ public class ExecutionService {
                         VALUES (?, ?, ?, ?, ?, 'QUEUED', ?)
                         """, executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey,
                 Timestamp.from(now));
+        String platform = jdbcTemplate.queryForObject(
+                "SELECT platform FROM official_accounts WHERE operation_id = ? LIMIT 1", String.class, operationId);
+        if ("WEB".equals(platform)) {
+            webWorkerLauncher.launchIfNeeded();
+        }
         return new ExecutionDto(executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey, "QUEUED", now);
     }
 
