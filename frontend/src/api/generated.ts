@@ -191,6 +191,7 @@ export interface ExecutionTestResult {
   status: TestResultStatus;
   durationMs: number | null;
   errorCategory: ErrorCategory | null;
+  errorMessage: string | null;
 }
 
 /** One evidence file's metadata, as returned by GET /test-results/{testResultId}/evidence. */
@@ -236,6 +237,7 @@ export interface TestResultPayload {
   status: TestResultStatus;
   durationMs: number;
   errorCategory: ErrorCategory | null;
+  errorMessage: string | null;
 }
 
 export interface HeartbeatPayload {

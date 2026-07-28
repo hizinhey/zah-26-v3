@@ -307,6 +307,46 @@ describe("ExecuteScreen", () => {
     expect(mocks.listEvidence).toHaveBeenCalledWith("result-1");
   });
 
+  it("shows the Hub-reported failure reason next to View Evidence once the result is fetched", async () => {
+    const { queryClient } = renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
+    const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;
+    await waitFor(() => expect(mocks.getExecution).toHaveBeenCalled());
+
+    dispatchEnvelope({
+      messageId: "m1",
+      version: 1,
+      type: "TEST_RESULT",
+      timestamp: "2026-07-27T00:00:01Z",
+      payload: {
+        executionId: "exec-1",
+        testCaseId: "tc-1-1",
+        attempt: 1,
+        status: "FAILED",
+        durationMs: 500,
+        errorCategory: "ASSERTION_FAILURE",
+        errorMessage: "AssertionError: expected 'Open' to equal ''",
+      },
+    });
+    mocks.getExecution.mockResolvedValue({
+      ...execution(),
+      results: [
+        {
+          id: "result-1",
+          testCaseId: "tc-1-1",
+          attempt: 1,
+          status: "FAILED",
+          durationMs: 500,
+          errorCategory: "ASSERTION_FAILURE",
+          errorMessage: "AssertionError: expected 'Open' to equal ''",
+        },
+      ],
+    });
+    await queryClient.refetchQueries({ queryKey: executionQueryKey("op-1") });
+
+    expect(await screen.findByText("AssertionError: expected 'Open' to equal ''")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View Evidence" })).toBeInTheDocument();
+  });
+
   it("closes the evidence modal on Escape", async () => {
     const { queryClient } = renderScreen({ seedPlan: plan({ testCases: fiveCasesFor(1) }), seedExecution: execution() });
     const dispatchEnvelope = channelSpy.mock.calls[0][0].onEnvelope as (envelope: unknown) => void;

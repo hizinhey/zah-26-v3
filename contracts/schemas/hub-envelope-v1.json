@@ -144,6 +144,12 @@
             { "$ref": "#/$defs/ErrorCategory" },
             { "type": "null" }
           ]
+        },
+        "errorMessage": {
+          "anyOf": [
+            { "type": "string" },
+            { "type": "null" }
+          ]
         }
       }
     },

@@ -200,3 +200,12 @@
   cursor: pointer;
   min-height: var(--ops-min-target-size);
 }
+
+.errorMessage {
+  display: block;
+  color: var(--ops-color-gray-700);
+  font-size: var(--ops-font-size-sm);
+  margin-bottom: var(--ops-space-2);
+  max-width: 32ch;
+  overflow-wrap: break-word;
+}

@@ -384,7 +384,7 @@ class MvpLifecycleIT {
     private void postResult(UUID hubId, HttpHeaders headers, UUID executionId, UUID testCaseId,
                              int attempt, String status, String errorCategory) {
         HubEnvelopeV1 resultEnvelope = HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(executionId, testCaseId, attempt, status, 1000, errorCategory));
+                new HubPayloads.TestResultPayload(executionId, testCaseId, attempt, status, 1000, errorCategory, null));
         ResponseEntity<Void> response = restTemplate.exchange(
                 "http://localhost:{port}/api/v1/hubs/{hubId}/results",
                 HttpMethod.POST, new HttpEntity<>(resultEnvelope, headers), Void.class, port, hubId);

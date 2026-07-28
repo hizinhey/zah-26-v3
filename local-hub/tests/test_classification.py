@@ -1,4 +1,9 @@
-from opshub_hub.classification import FailureCategory, classify_failure
+from opshub_hub.classification import (
+    MAX_FAILURE_SUMMARY_LENGTH,
+    FailureCategory,
+    classify_failure,
+    extract_failure_summary,
+)
 
 
 def test_mocha_assertion_failure_is_classified_as_assertion():
@@ -47,3 +52,35 @@ def test_timed_out_flag_wins_even_if_message_also_looks_like_infrastructure():
     stderr = "session not created\nTimed out after 30s waiting for the spec to finish."
     category = classify_failure(returncode=-1, stdout="", stderr=stderr, timed_out=True)
     assert category is FailureCategory.TIMEOUT
+
+
+def test_extract_failure_summary_returns_the_last_meaningful_line():
+    stdout = (
+        "1 passing\n1 failing\n\n"
+        "1) OA delivery test\n   expected 'Hello' to equal 'Goodbye'\n"
+        "   AssertionError: expected 'Hello' to equal 'Goodbye'\n\n\n"
+    )
+    summary = extract_failure_summary(stdout=stdout, stderr="")
+    assert summary == "AssertionError: expected 'Hello' to equal 'Goodbye'"
+
+
+def test_extract_failure_summary_ignores_trailing_blank_lines_in_stderr():
+    stdout = ""
+    stderr = "Error: expected non-empty content, got ''\n\n   \n"
+    summary = extract_failure_summary(stdout=stdout, stderr=stderr)
+    assert summary == "Error: expected non-empty content, got ''"
+
+
+def test_extract_failure_summary_is_empty_when_no_output_at_all():
+    assert extract_failure_summary(stdout="", stderr="") == ""
+
+
+def test_extract_failure_summary_truncates_a_very_long_line():
+    long_line = "x" * (MAX_FAILURE_SUMMARY_LENGTH + 200)
+    summary = extract_failure_summary(stdout=long_line, stderr="")
+    assert len(summary) == MAX_FAILURE_SUMMARY_LENGTH
+
+
+def test_extract_failure_summary_reports_timeout_message_regardless_of_output():
+    summary = extract_failure_summary(stdout="", stderr="session not created", timed_out=True)
+    assert summary == "Timed out waiting for the spec to finish."

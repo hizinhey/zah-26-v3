@@ -183,6 +183,7 @@ def test_full_two_oa_job_produces_envelopes_that_satisfy_both_the_json_schema_an
             "status",
             "durationMs",
             "errorCategory",
+            "errorMessage",
         }
         assert payload["executionId"] == str(execution_id)
         assert payload["status"] in {"PASSED", "FAILED", "ERROR"}

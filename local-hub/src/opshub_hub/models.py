@@ -156,6 +156,10 @@ class TestResultPayload(StrictModel):
     status: TestResultStatus
     durationMs: int = Field(ge=0)
     errorCategory: ErrorCategory | None
+    errorMessage: str | None = None
+    """Human-readable reason the attempt failed (see classification.extract_failure_summary) -
+    None for PASSED attempts. Optional/defaulted for backward compatibility with older Hub
+    versions that don't send it."""
 
 
 class HeartbeatPayload(StrictModel):

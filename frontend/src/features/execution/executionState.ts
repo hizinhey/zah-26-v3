@@ -13,6 +13,7 @@ export interface LiveTestCaseState {
   startedAt: string | null;
   durationMs: number | null;
   errorCategory: ErrorCategory | null;
+  errorMessage: string | null;
 }
 
 export interface LogEntry {
@@ -29,7 +30,15 @@ export interface ExecutionState {
 export const INITIAL_EXECUTION_STATE: ExecutionState = { cases: {}, logs: [] };
 
 function initialCaseState(): LiveTestCaseState {
-  return { status: "PENDING", message: null, attempt: null, startedAt: null, durationMs: null, errorCategory: null };
+  return {
+    status: "PENDING",
+    message: null,
+    attempt: null,
+    startedAt: null,
+    durationMs: null,
+    errorCategory: null,
+    errorMessage: null,
+  };
 }
 
 /**
@@ -73,7 +82,7 @@ export function applyEnvelope(state: ExecutionState, envelope: HubEnvelopeV1): E
   }
 
   if (envelope.type === "TEST_RESULT") {
-    const { testCaseId, status, attempt, durationMs, errorCategory } = envelope.payload;
+    const { testCaseId, status, attempt, durationMs, errorCategory, errorMessage } = envelope.payload;
     const previous = state.cases[testCaseId] ?? initialCaseState();
     return {
       cases: {
@@ -84,6 +93,7 @@ export function applyEnvelope(state: ExecutionState, envelope: HubEnvelopeV1): E
           attempt,
           durationMs,
           errorCategory,
+          errorMessage,
         },
       },
       logs: [
@@ -119,7 +129,8 @@ export function hydrateFromResults(state: ExecutionState, results: ExecutionTest
       previous.attempt === result.attempt &&
       previous.status === result.status &&
       previous.durationMs === result.durationMs &&
-      previous.errorCategory === result.errorCategory
+      previous.errorCategory === result.errorCategory &&
+      previous.errorMessage === result.errorMessage
     ) {
       continue;
     }
@@ -133,6 +144,7 @@ export function hydrateFromResults(state: ExecutionState, results: ExecutionTest
       attempt: result.attempt,
       durationMs: result.durationMs,
       errorCategory: result.errorCategory,
+      errorMessage: result.errorMessage,
     };
   }
   return changed ? { ...state, cases } : state;

@@ -169,6 +169,8 @@ def test_continues_through_every_test_after_assertion_failure(tmp_path):
         TestResultStatus.PASSED,
     ]
     assert summary.results[1].errorCategory == ErrorCategory.ASSERTION_FAILURE
+    assert summary.results[1].errorMessage == "AssertionError: expected 'A' to equal 'B'"
+    assert summary.results[0].errorMessage is None  # PASSED attempts carry no error message
 
 
 def test_no_retry_after_assertion_failure(tmp_path):

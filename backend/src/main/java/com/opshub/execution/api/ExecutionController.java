@@ -50,9 +50,9 @@ public class ExecutionController {
         }
     }
 
-    public record TestResultResponse(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory) {
+    public record TestResultResponse(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory, String errorMessage) {
         private static TestResultResponse from(ExecutionService.TestResultDto dto) {
-            return new TestResultResponse(dto.id(), dto.testCaseId(), dto.attempt(), dto.status(), dto.durationMs(), dto.errorCategory());
+            return new TestResultResponse(dto.id(), dto.testCaseId(), dto.attempt(), dto.status(), dto.durationMs(), dto.errorCategory(), dto.errorMessage());
         }
     }
 

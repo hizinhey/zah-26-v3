@@ -86,7 +86,7 @@ class HubProtocolIT {
 
         UUID testCaseId = payload.testCases().get(0).testCaseId();
         HubEnvelopeV1 resultEnvelope = HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 1200, null));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 1200, null, null));
         ResponseEntity<Void> resultResponse = restTemplate.exchange(
                 "http://localhost:{port}/api/v1/hubs/{hubId}/results",
                 HttpMethod.POST, new HttpEntity<>(resultEnvelope, headers), Void.class, port, hubId);

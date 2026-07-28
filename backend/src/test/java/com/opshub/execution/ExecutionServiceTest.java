@@ -202,7 +202,7 @@ class ExecutionServiceTest {
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
 
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null)));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null, null)));
 
         // Simulate the lease expiring without the Hub finishing the remaining test cases.
         jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?", Instant.now().minusSeconds(5), hubId);
@@ -211,7 +211,7 @@ class ExecutionServiceTest {
         assertThat(reoffer).isPresent();
 
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 750, null)));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 750, null, null)));
 
         Integer storedResultsForCase = jdbcTemplate.queryForObject("""
                         SELECT COUNT(*) FROM test_results WHERE execution_id = ? AND test_case_id = ?
@@ -235,7 +235,7 @@ class ExecutionServiceTest {
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
 
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null)));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null, null)));
 
         UUID expectedTestResultId = UUID.nameUUIDFromBytes(
                 (execution.id() + ":" + testCaseId + ":1").getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -248,7 +248,7 @@ class ExecutionServiceTest {
         // create a second one - the Hub can retry safely without evidence uploads targeting
         // a stale or duplicate test_results.id.
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 600, null)));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 600, null, null)));
         UUID storedTestResultIdAfterRedelivery = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_results WHERE execution_id = ? AND test_case_id = ? AND attempt = 1",
                 UUID.class, execution.id(), testCaseId);
@@ -283,7 +283,7 @@ class ExecutionServiceTest {
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
-                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null)));
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null, null)));
 
         ExecutionService.ExecutionStatusDto status = executionService.findById(execution.id());
 
@@ -295,6 +295,35 @@ class ExecutionServiceTest {
         UUID expectedTestResultId = UUID.nameUUIDFromBytes(
                 (execution.id() + ":" + testCaseId + ":1").getBytes(java.nio.charset.StandardCharsets.UTF_8));
         assertThat(result.id()).isEqualTo(expectedTestResultId);
+    }
+
+    /**
+     * The Hub only ever reported a coarse errorCategory enum for a failed/errored result - no
+     * way to see why it actually failed without SSHing into the Hub host and reading its local
+     * log file. errorMessage carries a short, human-readable reason (e.g. the OA's own
+     * assertion failure text) alongside errorCategory; proves it persists through recordResult
+     * and comes back out of findById.
+     */
+    @Test
+    void findByIdReturnsTheHubReportedErrorMessageForAFailedResult() {
+        UUID operationId = createDraftOperation("MOB-613");
+        UUID planId = approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-error-message");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
+        executionService.offerNextJob(hubId);
+        UUID testCaseId = jdbcTemplate.queryForObject(
+                "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
+
+        executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
+                new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "FAILED", 500,
+                        "ASSERTION_FAILURE", "AssertionError: expected 'Open' to equal ''")));
+
+        ExecutionService.TestResultDto result = executionService.findById(execution.id()).results().get(0);
+
+        assertThat(result.status()).isEqualTo("FAILED");
+        assertThat(result.errorCategory()).isEqualTo("ASSERTION_FAILURE");
+        assertThat(result.errorMessage()).isEqualTo("AssertionError: expected 'Open' to equal ''");
     }
 
     @Test

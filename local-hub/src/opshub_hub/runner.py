@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 from uuid import UUID, uuid4
 
-from opshub_hub.classification import FailureCategory, classify_failure
+from opshub_hub.classification import FailureCategory, classify_failure, extract_failure_summary
 from opshub_hub.evidence import (
     EvidenceFile,
     EvidenceType,
@@ -71,6 +71,7 @@ class AttemptRecord:
     attempt: int
     status: TestResultStatus
     error_category: ErrorCategory | None
+    error_message: str | None
     duration_ms: int
     log_path: Path
 
@@ -192,6 +193,7 @@ class Runner:
                 status=record.status,
                 durationMs=record.duration_ms,
                 errorCategory=record.error_category,
+                errorMessage=record.error_message,
             )
             self._send_result(result_payload)
             summary.results.append(result_payload)
@@ -202,7 +204,7 @@ class Runner:
                 job.executionId,
                 test_case.testCaseId,
                 _TERMINAL_PROGRESS_STATUS[record.status],
-                "Completed",
+                record.error_message or "Completed",
             )
 
         return summary
@@ -224,10 +226,14 @@ class Runner:
         if process.returncode == 0:
             status = TestResultStatus.PASSED
             category: ErrorCategory | None = None
+            message: str | None = None
         else:
             failure = classify_failure(
                 returncode=process.returncode, stdout=process.stdout, stderr=process.stderr,
                 timed_out=process.timed_out,
+            )
+            message = extract_failure_summary(
+                stdout=process.stdout, stderr=process.stderr, timed_out=process.timed_out
             )
             if failure is FailureCategory.INFRASTRUCTURE:
                 status = TestResultStatus.ERROR
@@ -244,6 +250,7 @@ class Runner:
             attempt=attempt,
             status=status,
             error_category=category,
+            error_message=message,
             duration_ms=duration_ms,
             log_path=log_path,
         )

@@ -424,6 +424,10 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ErrorCategory'
             - type: 'null'
+        errorMessage:
+          anyOf:
+            - type: string
+            - type: 'null'
     HeartbeatPayload:
       type: object
       additionalProperties: false

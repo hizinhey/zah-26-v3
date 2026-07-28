@@ -45,7 +45,8 @@ public final class HubPayloads {
             int attempt,
             String status,
             long durationMs,
-            String errorCategory
+            String errorCategory,
+            String errorMessage
     ) {
     }
 

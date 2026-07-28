@@ -294,14 +294,22 @@ export function ExecuteScreen(): ReactElement {
                                 const result = (execution?.results ?? [])
                                   .filter((candidate) => candidate.testCaseId === testCase.testCaseId)
                                   .sort((a, b) => b.attempt - a.attempt)[0];
+                                const errorMessage = result?.errorMessage ?? live?.errorMessage ?? null;
                                 return result ? (
-                                  <button
-                                    type="button"
-                                    className={styles.evidenceButton}
-                                    onClick={() => setEvidenceTestResultId(result.id)}
-                                  >
-                                    View Evidence
-                                  </button>
+                                  <>
+                                    {errorMessage ? (
+                                      <span className={styles.errorMessage} title={errorMessage}>
+                                        {errorMessage}
+                                      </span>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      className={styles.evidenceButton}
+                                      onClick={() => setEvidenceTestResultId(result.id)}
+                                    >
+                                      View Evidence
+                                    </button>
+                                  </>
                                 ) : (
                                   "—"
                                 );

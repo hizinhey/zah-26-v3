@@ -115,11 +115,12 @@ public class ExecutionService {
                 .stream().findFirst()
                 .orElseThrow(() -> new ExecutionNotFoundException(executionId));
         List<TestResultDto> results = jdbcTemplate.query("""
-                        SELECT id, test_case_id, attempt, status, duration_ms, error_category
+                        SELECT id, test_case_id, attempt, status, duration_ms, error_category, error_message
                         FROM test_results WHERE execution_id = ? ORDER BY test_case_id, attempt
                         """, (rs, rowNum) -> new TestResultDto(
                         (UUID) rs.getObject("id"), (UUID) rs.getObject("test_case_id"), rs.getInt("attempt"),
-                        rs.getString("status"), (Long) rs.getObject("duration_ms"), rs.getString("error_category")),
+                        rs.getString("status"), (Long) rs.getObject("duration_ms"), rs.getString("error_category"),
+                        rs.getString("error_message")),
                 executionId);
         return new ExecutionStatusDto(execution, results);
     }
@@ -127,7 +128,7 @@ public class ExecutionService {
     // I6 fix: duration_ms is NOT NULL BIGINT on the wire and in the DB (V4__widen_duration_ms.sql)
     // - read as Long, not the previously nullable Integer, which was the more clearly wrong side
     // of that mismatch (a NOT NULL column read into a nullable narrower type).
-    public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory) {
+    public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory, String errorMessage) {
     }
 
     public record ExecutionStatusDto(ExecutionDto execution, List<TestResultDto> results) {
@@ -212,13 +213,14 @@ public class ExecutionService {
         requireMonotonic(payload.executionId(), envelope.timestamp());
 
         jdbcTemplate.update("""
-                        INSERT INTO test_results (id, execution_id, test_case_id, attempt, status, duration_ms, error_category)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO test_results (id, execution_id, test_case_id, attempt, status, duration_ms, error_category, error_message)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (execution_id, test_case_id, attempt)
-                        DO UPDATE SET status = EXCLUDED.status, duration_ms = EXCLUDED.duration_ms, error_category = EXCLUDED.error_category
+                        DO UPDATE SET status = EXCLUDED.status, duration_ms = EXCLUDED.duration_ms,
+                            error_category = EXCLUDED.error_category, error_message = EXCLUDED.error_message
                         """, testResultId(payload.executionId(), payload.testCaseId(), payload.attempt()),
                 payload.executionId(), payload.testCaseId(), payload.attempt(),
-                payload.status(), payload.durationMs(), payload.errorCategory());
+                payload.status(), payload.durationMs(), payload.errorCategory(), payload.errorMessage());
 
         completeIfEveryTestCaseReachedATerminalOutcome(payload.executionId());
     }

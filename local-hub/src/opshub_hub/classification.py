@@ -40,6 +40,31 @@ class FailureCategory(str, Enum):
     TIMEOUT = "TIMEOUT"
 
 
+MAX_FAILURE_SUMMARY_LENGTH = 500
+"""Caps how much of a spec's stdout/stderr rides in TestResultPayload.errorMessage - the full
+output already lives in the per-attempt log file (see Runner._execute_attempt's log_path); this
+is only meant to answer "why did it fail" at a glance, not replace the log."""
+
+
+def extract_failure_summary(*, stdout: str, stderr: str, timed_out: bool = False) -> str:
+    """Best-effort, human-readable reason a spec failed, for TestResultPayload.errorMessage.
+
+    Mocha/WebdriverIO print the actual assertion/error message as the last meaningful line of
+    combined stdout+stderr (e.g. "AssertionError: expected 'Open' to equal ''" for a genuinely
+    empty/missing OA field, or a WebDriver/Appium error for infrastructure trouble) - blank lines
+    and pure whitespace are common right before process exit and would otherwise win as "the last
+    line". Truncated to MAX_FAILURE_SUMMARY_LENGTH so a runaway stack trace can't bloat the wire
+    payload; the untruncated output is always in the attempt's own log file.
+    """
+    if timed_out:
+        return "Timed out waiting for the spec to finish."
+    combined = f"{stdout}\n{stderr}"
+    lines = [line.strip() for line in combined.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    return lines[-1][:MAX_FAILURE_SUMMARY_LENGTH]
+
+
 def classify_failure(*, returncode: int, stdout: str, stderr: str, timed_out: bool = False) -> FailureCategory:
     """Classify a non-zero-exit spec run.
 
