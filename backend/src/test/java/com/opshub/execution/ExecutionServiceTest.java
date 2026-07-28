@@ -327,7 +327,7 @@ class ExecutionServiceTest {
     }
 
     @Test
-    void sweepAbandonedExecutionsFailsARunningExecutionWhoseLeaseExpiredWellPastTheGracePeriod() {
+    void sweepAbandonedExecutionsFailsARunningExecutionWithNoActivityWellPastTheGracePeriod() {
         UUID operationId = createDraftOperation("MOB-610");
         approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-abandoned");
@@ -335,10 +335,10 @@ class ExecutionServiceTest {
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         assertThat(executionService.offerNextJob(hubId)).isPresent();
 
-        // Simulate a Hub that died mid-run: its lease expired long past the sweep's grace period,
-        // and nothing ever renewed or replaced it.
-        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?",
-                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), hubId);
+        // Simulate a Hub that died mid-run: it started long before the grace period and never
+        // sent a single progress/result message since.
+        jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
+                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
 
         executionService.sweepAbandonedExecutions();
 
@@ -348,7 +348,7 @@ class ExecutionServiceTest {
     }
 
     @Test
-    void sweepAbandonedExecutionsLeavesARecentlyExpiredLeaseAloneWithinTheGracePeriod() {
+    void sweepAbandonedExecutionsLeavesARecentlyStartedExecutionAloneWithinTheGracePeriod() {
         UUID operationId = createDraftOperation("MOB-611");
         approvePlan(operationId, 1);
         ExecutionDto execution = executionService.start(operationId, 1, "key-not-yet-abandoned");
@@ -356,10 +356,59 @@ class ExecutionServiceTest {
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
         assertThat(executionService.offerNextJob(hubId)).isPresent();
 
-        // Lease expired a moment ago, well within the grace period - still eligible for re-offer,
-        // not yet abandoned.
-        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?",
-                Instant.now().minusSeconds(5), hubId);
+        executionService.sweepAbandonedExecutions();
+
+        String status = jdbcTemplate.queryForObject(
+                "SELECT status FROM executions WHERE id = ?", String.class, execution.id());
+        assertThat(status).isEqualTo("RUNNING");
+    }
+
+    /**
+     * Regression test for the 2026-07-28 production incident: renewActiveLease (called on every
+     * heartbeat, whether or not the Hub is actually still working the leased execution) kept
+     * job_leases.expires_at fresh indefinitely for an execution the Hub had silently abandoned -
+     * which permanently blocked hasActiveLease/nextOfferableExecution from ever reclaiming it,
+     * AND defeated this very sweep, since its old staleness check also keyed off expires_at.
+     * Staleness must be judged by genuine per-execution activity (progress/result messages, or
+     * started_at absent any), never by the heartbeat-polluted lease.
+     */
+    @Test
+    void sweepAbandonedExecutionsFailsAnExecutionEvenWhileItsLeaseIsStillBeingRenewedByHeartbeats() {
+        UUID operationId = createDraftOperation("MOB-614");
+        approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-zombie-lease");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
+        assertThat(executionService.offerNextJob(hubId)).isPresent();
+
+        jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
+                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
+        // Simulate a Hub that's still alive and heartbeating (renewing the lease) despite having
+        // forgotten about this specific job.
+        assertThat(executionService.renewActiveLease(hubId)).isTrue();
+
+        executionService.sweepAbandonedExecutions();
+
+        String status = jdbcTemplate.queryForObject(
+                "SELECT status FROM executions WHERE id = ?", String.class, execution.id());
+        assertThat(status).isEqualTo("FAILED");
+    }
+
+    @Test
+    void sweepAbandonedExecutionsLeavesAnExecutionAloneIfItHasRecentGenuineProgressDespiteStartingLongAgo() {
+        UUID operationId = createDraftOperation("MOB-615");
+        UUID planId = approvePlan(operationId, 1);
+        ExecutionDto execution = executionService.start(operationId, 1, "key-genuinely-alive");
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
+        assertThat(executionService.offerNextJob(hubId)).isPresent();
+        UUID testCaseId = jdbcTemplate.queryForObject(
+                "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
+
+        jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
+                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
+        executionService.recordProgress(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_JOB_PROGRESS,
+                new HubPayloads.JobProgressPayload(execution.id(), testCaseId, "RUNNING", "Executing")));
 
         executionService.sweepAbandonedExecutions();
 

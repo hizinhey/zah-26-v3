@@ -282,50 +282,50 @@ public class ExecutionService {
     }
 
     /**
-     * Grace period past a lease's expiry before its execution is considered abandoned rather
-     * than merely awaiting re-offer. {@link LeaseService#nextOfferableExecution} already makes a
-     * RUNNING execution with an expired lease re-offerable immediately (so a Hub that's still
-     * alive but slow can pick it back up); this sweep only steps in once that hasn't happened for
-     * a while, on the assumption the Hub that held the lease is actually gone.
+     * Grace period of genuine inactivity before a RUNNING execution is considered abandoned. A
+     * Hub that's still alive but slow re-offers immediately once its lease expires (see
+     * {@link LeaseService#nextOfferableExecution}); this sweep only steps in once there has been
+     * no real per-execution activity for this long, on the assumption the Hub that was working
+     * this specific job is actually gone (even if the Hub process itself is still up).
      */
     public static final java.time.Duration ABANDONED_EXECUTION_GRACE_PERIOD = java.time.Duration.ofMinutes(10);
 
     /**
-     * I4 fix: previously nothing ever marked an execution FAILED if its lease expired with no
-     * Hub reclaiming it - a dead Hub mid-run left the execution RUNNING forever, endlessly
-     * re-offered from case 1 by {@link LeaseService#nextOfferableExecution}. Runs periodically
-     * (Spring {@code @Scheduled}, matching how this codebase would otherwise introduce a
-     * background task - there was no prior {@code @Scheduled} usage to follow, so this
-     * establishes the pattern) and fails any RUNNING execution whose most recent lease expired
-     * more than {@link #ABANDONED_EXECUTION_GRACE_PERIOD} ago with nothing renewing it since.
+     * I4 fix (2026-07-27): previously nothing ever marked an execution FAILED if its lease
+     * expired with no Hub reclaiming it. 2026-07-28 incident fix: the original staleness check
+     * keyed off job_leases.expires_at, which {@link #renewActiveLease} extends on every single
+     * heartbeat - including heartbeats from a Hub that's still connected but has silently
+     * abandoned this specific job (crashed/restarted mid-run without ever reporting a final
+     * result). That kept expires_at permanently fresh, which not only defeated this sweep but
+     * also permanently blocked {@link #offerNextJob} (via {@code hasActiveLease}) from ever
+     * dispatching anything else to that Hub - a live incident lasted over an hour before being
+     * diagnosed. Staleness is now judged by genuine per-execution activity - the last JOB_PROGRESS
+     * or TEST_RESULT message recorded in {@link #lastMessageTimestamps}, falling back to
+     * {@code started_at} for an execution that's had no message at all (including right after a
+     * backend restart, which clears that in-memory map) - never by the lease itself.
      */
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
     @Transactional
     public void sweepAbandonedExecutions() {
         Instant cutoff = Instant.now().minus(ABANDONED_EXECUTION_GRACE_PERIOD);
-        List<UUID> abandoned = jdbcTemplate.query("""
-                        SELECT execution.id
-                        FROM executions execution
-                        WHERE execution.status = 'RUNNING'
-                          AND execution.finished_at IS NULL
-                          AND EXISTS (
-                              SELECT 1 FROM job_leases lease
-                              WHERE lease.execution_id = execution.id AND lease.expires_at <= ?
-                          )
-                          AND NOT EXISTS (
-                              SELECT 1 FROM job_leases lease
-                              WHERE lease.execution_id = execution.id AND lease.expires_at > ?
-                          )
-                        """, (rs, rowNum) -> (UUID) rs.getObject("id"), Timestamp.from(cutoff),
-                Timestamp.from(Instant.now()));
+        List<RunningExecution> running = jdbcTemplate.query("""
+                        SELECT id, started_at FROM executions WHERE status = 'RUNNING' AND finished_at IS NULL
+                        """,
+                (rs, rowNum) -> new RunningExecution((UUID) rs.getObject("id"), rs.getTimestamp("started_at").toInstant()));
 
-        for (UUID executionId : abandoned) {
-            jdbcTemplate.update("""
-                            UPDATE executions SET status = 'FAILED', finished_at = ? WHERE id = ?
-                            """, Timestamp.from(Instant.now()), executionId);
-            leaseService.release(executionId);
-            lastMessageTimestamps.remove(executionId);
+        for (RunningExecution execution : running) {
+            Instant lastActivity = lastMessageTimestamps.getOrDefault(execution.id(), execution.startedAt());
+            if (lastActivity.isBefore(cutoff)) {
+                jdbcTemplate.update("""
+                                UPDATE executions SET status = 'FAILED', finished_at = ? WHERE id = ?
+                                """, Timestamp.from(Instant.now()), execution.id());
+                leaseService.release(execution.id());
+                lastMessageTimestamps.remove(execution.id());
+            }
         }
+    }
+
+    private record RunningExecution(UUID id, Instant startedAt) {
     }
 
     private void requireHubOnline(UUID hubId) {
