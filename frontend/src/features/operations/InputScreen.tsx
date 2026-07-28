@@ -329,9 +329,9 @@ export function InputScreen(): ReactElement {
               </DisabledReason>
             </div>
             <p className={styles.hint}>
-              Vui lòng nhập đầy đủ thông tin cho OA đang chọn.
-              <br />
-              Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo.
+              {requiredFieldsFilled
+                ? "Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo."
+                : "Vui lòng nhập đầy đủ thông tin cho OA đang chọn."}
             </p>
           </div>
         </div>

@@ -51,6 +51,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--ops-space-2);
+  line-height: 1;
   padding: var(--ops-space-2) var(--ops-space-4);
   min-height: var(--ops-min-target-size);
   border: 1px solid var(--ops-color-gray-300);
@@ -65,6 +66,11 @@
   border-color: var(--ops-color-blue-500);
   background: var(--ops-color-blue-50);
   color: var(--ops-color-blue-600);
+}
+
+.platformIcon {
+  display: block;
+  flex-shrink: 0;
 }
 
 .input,

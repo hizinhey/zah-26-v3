@@ -239,16 +239,15 @@ export function VerifyScreen(): ReactElement {
 
       <div className={styles.actions}>
         <DisabledReason reason={generateDisabledReason}>
-          <button type="button" className="ops-primary-button" onClick={handleGenerate}>
+          <button
+            type="button"
+            className={`ops-primary-button ${styles.generateButton}`}
+            onClick={handleGenerate}
+          >
             <AiIcon />
             AI Generate
           </button>
         </DisabledReason>
-        {!canGenerate ? (
-          <p className={styles.generateHint}>
-            Generate chỉ được bật khi tất cả OA đã Pass AI Validation.
-          </p>
-        ) : null}
       </div>
     </div>
   );

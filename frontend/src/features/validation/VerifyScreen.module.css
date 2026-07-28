@@ -88,7 +88,8 @@
   margin-top: var(--ops-space-6);
 }
 
-.generateHint {
-  color: var(--ops-color-gray-500);
+.generateButton:disabled {
+  padding: var(--ops-space-2) var(--ops-space-4);
+  min-height: auto;
   font-size: var(--ops-font-size-sm);
 }

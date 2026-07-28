@@ -18,10 +18,6 @@
   cursor: pointer;
 }
 
-.backButton:disabled {
-  color: var(--ops-color-gray-300);
-  cursor: not-allowed;
-}
 
 .crumbs {
   display: flex;

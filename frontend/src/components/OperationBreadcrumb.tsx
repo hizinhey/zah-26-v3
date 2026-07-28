@@ -16,14 +16,15 @@ export function OperationBreadcrumb({ operationId, currentStepId }: OperationBre
 
   return (
     <div className={styles.bar}>
-      <button
-        type="button"
-        className={styles.backButton}
-        onClick={() => navigate(`/operations/${operationId}/${previousStep?.path}`)}
-        disabled={!previousStep}
-      >
-        ← Back
-      </button>
+      {previousStep ? (
+        <button
+          type="button"
+          className={styles.backButton}
+          onClick={() => navigate(`/operations/${operationId}/${previousStep.path}`)}
+        >
+          ← Back
+        </button>
+      ) : null}
       <nav aria-label="Breadcrumb">
         <ol className={styles.crumbs}>
           <li className={styles.crumb}>Operations</li>

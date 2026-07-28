@@ -55,7 +55,7 @@ export function OaEditor({ oa, onFieldChange }: OaEditorProps): ReactElement {
               data-selected={oa.platform === platform.value || undefined}
               onClick={() => onFieldChange("platform", platform.value)}
             >
-              <platform.Icon />
+              <platform.Icon className={styles.platformIcon} />
               {platform.label}
             </button>
           ))}
