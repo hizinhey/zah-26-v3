@@ -71,6 +71,21 @@ def test_extract_failure_summary_ignores_trailing_blank_lines_in_stderr():
     assert summary == "Error: expected non-empty content, got ''"
 
 
+def test_extract_failure_summary_skips_trailing_stack_frames_to_find_the_assertion_line():
+    # Real wdio output: the assertion is followed by a printed stack trace, each line
+    # prefixed with the multi-remote instance tag ("[0-0]") - the stack frames are the
+    # last lines, not the assertion, so a naive "last line" pick returns a useless
+    # internal wdio frame instead of the actual failure reason.
+    stdout = (
+        "[0-0] 1) OA content\n"
+        "[0-0]    AssertionError: expected 'Mở rộng danh bạ' to equal 'Mở rộng bạn bè'\n"
+        "[0-0]     at async Context.<anonymous> (/spec.ts:24:20)\n"
+        "[0-0]     at async Runner.run (file:///.../node_modules/@wdio/runner/build/index.js:711:16)\n"
+    )
+    summary = extract_failure_summary(stdout=stdout, stderr="")
+    assert summary == "AssertionError: expected 'Mở rộng danh bạ' to equal 'Mở rộng bạn bè'"
+
+
 def test_extract_failure_summary_is_empty_when_no_output_at_all():
     assert extract_failure_summary(stdout="", stderr="") == ""
 

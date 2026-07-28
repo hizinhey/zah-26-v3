@@ -46,20 +46,32 @@ output already lives in the per-attempt log file (see Runner._execute_attempt's 
 is only meant to answer "why did it fail" at a glance, not replace the log."""
 
 
+_INSTANCE_TAG_PATTERN = re.compile(r"^\[[^\]]*\]\s*")
+"""Strips a wdio multi-remote instance tag (e.g. "[0-0] ") that prefixes every line of output."""
+
+_STACK_FRAME_PATTERN = re.compile(r"^at\s")
+"""Matches a printed JS stack frame line (e.g. "at async Runner.run (...)"), after the instance
+tag has been stripped. Mocha/WebdriverIO print these *after* the actual assertion/error message,
+so they - not the assertion - end up as "the last line" of output and must be skipped when
+looking for the failure reason."""
+
+
 def extract_failure_summary(*, stdout: str, stderr: str, timed_out: bool = False) -> str:
     """Best-effort, human-readable reason a spec failed, for TestResultPayload.errorMessage.
 
-    Mocha/WebdriverIO print the actual assertion/error message as the last meaningful line of
-    combined stdout+stderr (e.g. "AssertionError: expected 'Open' to equal ''" for a genuinely
-    empty/missing OA field, or a WebDriver/Appium error for infrastructure trouble) - blank lines
-    and pure whitespace are common right before process exit and would otherwise win as "the last
-    line". Truncated to MAX_FAILURE_SUMMARY_LENGTH so a runaway stack trace can't bloat the wire
-    payload; the untruncated output is always in the attempt's own log file.
+    Mocha/WebdriverIO print the actual assertion/error message (e.g. "AssertionError: expected
+    'Open' to equal ''" for a genuinely empty/missing OA field, or a WebDriver/Appium error for
+    infrastructure trouble) followed by a stack trace - so the last meaningful line is usually an
+    internal stack frame, not the assertion itself. Blank lines and pure whitespace are common
+    right before process exit and would otherwise win as "the last line" too. Truncated to
+    MAX_FAILURE_SUMMARY_LENGTH so a runaway stack trace can't bloat the wire payload; the
+    untruncated output is always in the attempt's own log file.
     """
     if timed_out:
         return "Timed out waiting for the spec to finish."
     combined = f"{stdout}\n{stderr}"
-    lines = [line.strip() for line in combined.splitlines() if line.strip()]
+    lines = [_INSTANCE_TAG_PATTERN.sub("", line.strip()) for line in combined.splitlines() if line.strip()]
+    lines = [line for line in lines if line and not _STACK_FRAME_PATTERN.match(line)]
     if not lines:
         return ""
     return lines[-1][:MAX_FAILURE_SUMMARY_LENGTH]
