@@ -27,7 +27,13 @@ class ZBusinessChatScreen {
 
   async waitForOpened(oaName: string): Promise<void> {
     await this.title.waitForDisplayed();
-    await this.title.waitUntil(async () => (await this.title.getText()) === oaName, { timeoutMsg: `Chat title did not become "${oaName}"` });
+    try {
+      await this.title.waitUntil(async () => (await this.title.getText()) === oaName, { timeoutMsg: `Chat title did not become "${oaName}"` });
+    } catch (err) {
+      const actualTitle = await this.title.getText().catch(() => '<unreadable>');
+      console.log(`[ZBusinessChatScreen] waitForOpened("${oaName}") failed — actual title was: "${actualTitle}"`);
+      throw err;
+    }
   }
   async isLastCardThumbnailDisplayed(): Promise<boolean> { return this.lastRichCardThumbnail.isDisplayed(); }
   async isLastCardThumbnailMatching(referenceImageUrl: string): Promise<boolean> {

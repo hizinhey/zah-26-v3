@@ -55,6 +55,17 @@ tag has been stripped. Mocha/WebdriverIO print these *after* the actual assertio
 so they - not the assertion - end up as "the last line" of output and must be skipped when
 looking for the failure reason."""
 
+_FRAMEWORK_LOG_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+(?:INFO|WARN|ERROR|DEBUG)\b")
+"""Matches wdio/webdriver/appium-service's own timestamped bookkeeping logs (e.g. "INFO
+@wdio/appium-service: Killing entire Appium tree"), which keep printing to stdout *after* the
+Mocha reporter's actual failure block as the runner tears the session down - so without this
+filter they, not the assertion, would win as "the last line"."""
+
+_SUMMARY_FOOTER_PATTERN = re.compile(r"^Spec Files:\s")
+"""Matches the reporter's trailing run-summary line (e.g. "Spec Files:  0 passed, 1 failed, 1
+total ..."), which prints *after* the actual failure block and would otherwise win as "the last
+line" instead of the assertion."""
+
 
 def extract_failure_summary(*, stdout: str, stderr: str, timed_out: bool = False) -> str:
     """Best-effort, human-readable reason a spec failed, for TestResultPayload.errorMessage.
@@ -69,12 +80,42 @@ def extract_failure_summary(*, stdout: str, stderr: str, timed_out: bool = False
     """
     if timed_out:
         return "Timed out waiting for the spec to finish."
-    combined = f"{stdout}\n{stderr}"
-    lines = [_INSTANCE_TAG_PATTERN.sub("", line.strip()) for line in combined.splitlines() if line.strip()]
-    lines = [line for line in lines if line and not _STACK_FRAME_PATTERN.match(line)]
+
+    def _clean(text: str) -> list[str]:
+        lines = [_INSTANCE_TAG_PATTERN.sub("", line.strip()) for line in text.splitlines() if line.strip()]
+        return [line for line in lines if line and not _STACK_FRAME_PATTERN.match(line)]
+
+    # Mocha/WebdriverIO print the actual assertion/error message to stdout (the "spec" reporter
+    # output); stderr is mostly benign process noise (e.g. the ConfigParser "pattern ... did not
+    # match any file" warning, which fires on every run regardless of pass/fail). Concatenating
+    # stdout+stderr and taking the last line let that stderr noise silently win over the real
+    # stdout failure reason - stderr is only a fallback for cases where the process died before
+    # the reporter ever printed anything (genuine infrastructure trouble with no stdout at all).
+    stdout_lines, stderr_lines = _clean(stdout), _clean(stderr)
+
+    def _drop_noise(candidate: list[str]) -> list[str]:
+        return [
+            line
+            for line in candidate
+            if not _FRAMEWORK_LOG_PATTERN.match(line) and not _SUMMARY_FOOTER_PATTERN.match(line)
+        ]
+
+    # Prefer the reporter's own output over the runner's timestamped teardown/bookkeeping logs
+    # (e.g. "INFO @wdio/appium-service: ...") and the trailing "Spec Files: ..." summary, both of
+    # which print to stdout *after* the failure block as the session shuts down. Fall back to the
+    # noisy lines only if nothing else is available.
+    lines = _drop_noise(stdout_lines) or _drop_noise(stderr_lines) or stdout_lines or stderr_lines
     if not lines:
         return ""
-    return lines[-1][:MAX_FAILURE_SUMMARY_LENGTH]
+    # A bare "Received: ..." last line (Jest-style expect().toBe() diff output) is meaningless
+    # on its own - the server needs to see what was actually expected too. When the preceding
+    # line is the matching "Expected: ...", report both together as one clear sentence instead
+    # of just the last line.
+    if lines[-1].startswith("Received:") and len(lines) >= 2 and lines[-2].startswith("Expected:"):
+        summary = f"{lines[-2]}; {lines[-1]}"
+    else:
+        summary = lines[-1]
+    return summary[:MAX_FAILURE_SUMMARY_LENGTH]
 
 
 def classify_failure(*, returncode: int, stdout: str, stderr: str, timed_out: bool = False) -> FailureCategory:

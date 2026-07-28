@@ -18,13 +18,31 @@ class MessagesTab {
     );
   }
 
+  private async logVisibleConversationNames(context: string): Promise<void> {
+    try {
+      const items = await $$(
+        `android=new UiSelector().resourceId("${this.conversationListResourceId}")` +
+        '.childSelector(new UiSelector().className("android.widget.TextView"))',
+      );
+      const texts = await Promise.all(items.map(item => item.getText().catch(() => '<unreadable>')));
+      console.log(`[MessagesTab] ${context} — visible conversation texts:`, texts);
+    } catch (err) {
+      console.log(`[MessagesTab] ${context} — failed to read conversation list:`, err);
+    }
+  }
+
   async findConversation(name: string) {
     const onScreen = this.conversationByNameOnScreen(name);
     if (await onScreen.isDisplayed().catch(() => false)) {
       return onScreen;
     }
     const conversation = this.conversationByName(name);
-    await conversation.waitForDisplayed();
+    try {
+      await conversation.waitForDisplayed();
+    } catch (err) {
+      await this.logVisibleConversationNames(`could not find conversation "${name}"`);
+      throw err;
+    }
     return conversation;
   }
 
