@@ -19,6 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,7 +88,7 @@ class ExecutionServiceTest {
         executionService.start(operationId, 1, "key-offline");
         UUID hubId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> executionService.offerNextJob(hubId))
+        assertThatThrownBy(() -> executionService.offerNextJob(hubId, "ANDROID"))
                 .isInstanceOf(HubNotOnlineException.class);
     }
 
@@ -99,14 +100,14 @@ class ExecutionServiceTest {
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
-        Optional<HubEnvelopeV1> firstOffer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> firstOffer = executionService.offerNextJob(hubId, "ANDROID");
         assertThat(firstOffer).isPresent();
         assertThat(firstOffer.get().type()).isEqualTo(HubEnvelopeV1.TYPE_JOB_OFFERED);
         HubPayloads.JobOfferedPayload payload = (HubPayloads.JobOfferedPayload) firstOffer.get().payload();
         assertThat(payload.testCases()).hasSize(5);
         assertThat(payload.leaseToken()).isNotNull();
 
-        Optional<HubEnvelopeV1> secondOffer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> secondOffer = executionService.offerNextJob(hubId, "ANDROID");
         assertThat(secondOffer).isEmpty();
     }
 
@@ -118,7 +119,7 @@ class ExecutionServiceTest {
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "WEB");
 
-        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId, "WEB");
 
         assertThat(offer).isPresent();
         HubPayloads.JobOfferedPayload payload = (HubPayloads.JobOfferedPayload) offer.get().payload();
@@ -140,15 +141,45 @@ class ExecutionServiceTest {
         UUID androidHubId = UUID.randomUUID();
         hubConnectionService.markOnline(androidHubId, "WEBSOCKET", "ANDROID");
 
-        assertThat(executionService.offerNextJob(androidHubId)).isEmpty();
+        assertThat(executionService.offerNextJob(androidHubId, "ANDROID")).isEmpty();
 
         UUID webHubId = UUID.randomUUID();
         hubConnectionService.markOnline(webHubId, "WEBSOCKET", "WEB");
-        assertThat(executionService.offerNextJob(webHubId)).isPresent();
+        assertThat(executionService.offerNextJob(webHubId, "WEB")).isPresent();
     }
 
     /**
-     * Regression coverage for a review finding on the first cut of this test: it queried
+     * Proves the actual feature this task delivers: a single Hub process can hold one active
+     * ANDROID lease and one active WEB lease at the same time (job dispatch is now scoped per
+     * (hub, platform) rather than per hub), while the "one active lease per platform" invariant
+     * still holds independently for each platform.
+     */
+    @Test
+    void aHubCanHoldOneActiveAndroidLeaseAndOneActiveWebLeaseAtTheSameTime() {
+        UUID androidOperationId = createDraftOperation("MOB-620");
+        approvePlan(androidOperationId, 1, "ANDROID");
+        executionService.start(androidOperationId, 1, "key-concurrent-android");
+
+        UUID webOperationId = createDraftOperation("MOB-621");
+        approvePlan(webOperationId, 1, "WEB");
+        executionService.start(webOperationId, 1, "key-concurrent-web");
+
+        UUID hubId = UUID.randomUUID();
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
+        hubConnectionService.markOnline(hubId, "WEBSOCKET", "WEB");
+
+        Optional<HubEnvelopeV1> androidOffer = executionService.offerNextJob(hubId, "ANDROID");
+        Optional<HubEnvelopeV1> webOffer = executionService.offerNextJob(hubId, "WEB");
+
+        assertThat(androidOffer).isPresent();
+        assertThat(webOffer).isPresent();
+        // A second ANDROID offer must still be refused - the WEB lease does not block it, but
+        // ANDROID's own active lease does.
+        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isEmpty();
+    }
+
+    /**
+     * Regression test for the first cut of this test: it queried
      * {@code lease_token} straight out of the DB and called {@code executionService.renewLease(...)}
      * directly, which proved the CAS-renewal SQL works but never exercised the actual heartbeat
      * path a real Hub uses. Real end-to-end coverage - heartbeat over both the WebSocket and HTTPS
@@ -166,13 +197,13 @@ class ExecutionServiceTest {
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
-        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId, "ANDROID");
         assertThat(offer).isPresent();
 
         Instant expiresBefore = jdbcTemplate.queryForObject(
                 "SELECT expires_at FROM job_leases WHERE hub_id = ?", Instant.class, hubId);
 
-        boolean renewed = executionService.renewActiveLease(hubId);
+        boolean renewed = executionService.renewActiveLease(hubId, "ANDROID");
         assertThat(renewed).isTrue();
 
         Instant expiresAfter = jdbcTemplate.queryForObject(
@@ -185,7 +216,7 @@ class ExecutionServiceTest {
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
-        assertThat(executionService.renewActiveLease(hubId)).isFalse();
+        assertThat(executionService.renewActiveLease(hubId, "ANDROID")).isFalse();
     }
 
     @Test
@@ -196,7 +227,7 @@ class ExecutionServiceTest {
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
 
-        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> offer = executionService.offerNextJob(hubId, "ANDROID");
         assertThat(offer).isPresent();
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
@@ -205,9 +236,10 @@ class ExecutionServiceTest {
                 new HubPayloads.TestResultPayload(execution.id(), testCaseId, 1, "PASSED", 500, null, null)));
 
         // Simulate the lease expiring without the Hub finishing the remaining test cases.
-        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?", Instant.now().minusSeconds(5), hubId);
+        jdbcTemplate.update("UPDATE job_leases SET expires_at = ? WHERE hub_id = ?",
+                Timestamp.from(Instant.now().minusSeconds(5)), hubId);
 
-        Optional<HubEnvelopeV1> reoffer = executionService.offerNextJob(hubId);
+        Optional<HubEnvelopeV1> reoffer = executionService.offerNextJob(hubId, "ANDROID");
         assertThat(reoffer).isPresent();
 
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
@@ -230,7 +262,7 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-deterministic-id");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        executionService.offerNextJob(hubId);
+        executionService.offerNextJob(hubId, "ANDROID");
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
 
@@ -279,7 +311,7 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-find-by-id");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        executionService.offerNextJob(hubId);
+        executionService.offerNextJob(hubId, "ANDROID");
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
         executionService.recordResult(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_TEST_RESULT,
@@ -311,7 +343,7 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-error-message");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        executionService.offerNextJob(hubId);
+        executionService.offerNextJob(hubId, "ANDROID");
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
 
@@ -333,12 +365,12 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-abandoned");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        assertThat(executionService.offerNextJob(hubId)).isPresent();
+        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isPresent();
 
         // Simulate a Hub that died mid-run: it started long before the grace period and never
         // sent a single progress/result message since.
         jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
-                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
+                Timestamp.from(Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60)), execution.id());
 
         executionService.sweepAbandonedExecutions();
 
@@ -354,7 +386,7 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-not-yet-abandoned");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        assertThat(executionService.offerNextJob(hubId)).isPresent();
+        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isPresent();
 
         executionService.sweepAbandonedExecutions();
 
@@ -379,13 +411,13 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-zombie-lease");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        assertThat(executionService.offerNextJob(hubId)).isPresent();
+        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isPresent();
 
         jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
-                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
+                Timestamp.from(Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60)), execution.id());
         // Simulate a Hub that's still alive and heartbeating (renewing the lease) despite having
         // forgotten about this specific job.
-        assertThat(executionService.renewActiveLease(hubId)).isTrue();
+        assertThat(executionService.renewActiveLease(hubId, "ANDROID")).isTrue();
 
         executionService.sweepAbandonedExecutions();
 
@@ -401,12 +433,12 @@ class ExecutionServiceTest {
         ExecutionDto execution = executionService.start(operationId, 1, "key-genuinely-alive");
         UUID hubId = UUID.randomUUID();
         hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        assertThat(executionService.offerNextJob(hubId)).isPresent();
+        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isPresent();
         UUID testCaseId = jdbcTemplate.queryForObject(
                 "SELECT id FROM test_cases WHERE plan_id = ? ORDER BY case_order LIMIT 1", UUID.class, planId);
 
         jdbcTemplate.update("UPDATE executions SET started_at = ? WHERE id = ?",
-                Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60), execution.id());
+                Timestamp.from(Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60)), execution.id());
         executionService.recordProgress(HubEnvelopeV1.of(HubEnvelopeV1.TYPE_JOB_PROGRESS,
                 new HubPayloads.JobProgressPayload(execution.id(), testCaseId, "RUNNING", "Executing")));
 

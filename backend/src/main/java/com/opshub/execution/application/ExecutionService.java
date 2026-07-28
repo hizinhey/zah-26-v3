@@ -36,11 +36,14 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ExecutionService {
     private final JdbcTemplate jdbcTemplate;
     private final LeaseService leaseService;
-    private final WebWorkerLauncher webWorkerLauncher;
     private final ObjectMapper objectMapper;
 
-    /** Guards against concurrent job offers racing each other for the same Hub. */
-    private final ConcurrentHashMap<UUID, ReentrantLock> hubLocks = new ConcurrentHashMap<>();
+    /** Guards against concurrent job offers racing each other for the same (hub, platform) pair. */
+    private final ConcurrentHashMap<HubPlatformKey, ReentrantLock> hubLocks = new ConcurrentHashMap<>();
+
+    private record HubPlatformKey(UUID hubId, String platform) {
+    }
+
     /** Tracks the last accepted message timestamp per execution to enforce monotonic delivery. */
     private final ConcurrentHashMap<UUID, Instant> lastMessageTimestamps = new ConcurrentHashMap<>();
 
@@ -55,14 +58,13 @@ public class ExecutionService {
     );
 
     @Autowired
-    public ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, WebWorkerLauncher webWorkerLauncher) {
-        this(jdbcTemplate, leaseService, webWorkerLauncher, new ObjectMapper());
+    public ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService) {
+        this(jdbcTemplate, leaseService, new ObjectMapper());
     }
 
-    ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, WebWorkerLauncher webWorkerLauncher, ObjectMapper objectMapper) {
+    ExecutionService(JdbcTemplate jdbcTemplate, LeaseService leaseService, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.leaseService = leaseService;
-        this.webWorkerLauncher = webWorkerLauncher;
         this.objectMapper = objectMapper;
     }
 
@@ -99,11 +101,6 @@ public class ExecutionService {
                         VALUES (?, ?, ?, ?, ?, 'QUEUED', ?)
                         """, executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey,
                 Timestamp.from(now));
-        String platform = jdbcTemplate.queryForObject(
-                "SELECT platform FROM official_accounts WHERE operation_id = ? LIMIT 1", String.class, operationId);
-        if ("WEB".equals(platform)) {
-            webWorkerLauncher.launchIfNeeded();
-        }
         return new ExecutionDto(executionId, operationId, operation.approvedPlanId(), expectedRevision, idempotencyKey, "QUEUED", now);
     }
 
@@ -148,22 +145,23 @@ public class ExecutionService {
      * or there is nothing to offer.
      */
     @Transactional
-    public Optional<HubEnvelopeV1> offerNextJob(UUID hubId) {
-        String hubPlatform = requireHubOnlineAndGetPlatform(hubId);
-        ReentrantLock lock = hubLocks.computeIfAbsent(hubId, id -> new ReentrantLock());
+    public Optional<HubEnvelopeV1> offerNextJob(UUID hubId, String platform) {
+        requireHubPlatformOnline(hubId, platform);
+        HubPlatformKey key = new HubPlatformKey(hubId, platform);
+        ReentrantLock lock = hubLocks.computeIfAbsent(key, k -> new ReentrantLock());
         lock.lock();
         try {
-            if (leaseService.hasActiveLease(hubId)) {
+            if (leaseService.hasActiveLease(hubId, platform)) {
                 return Optional.empty();
             }
-            Optional<UUID> candidate = leaseService.nextOfferableExecution(hubPlatform);
+            Optional<UUID> candidate = leaseService.nextOfferableExecution(platform);
             if (candidate.isEmpty()) {
                 return Optional.empty();
             }
             UUID executionId = candidate.get();
             UUID leaseToken;
             try {
-                leaseToken = leaseService.acquire(hubId, executionId);
+                leaseToken = leaseService.acquire(hubId, platform, executionId);
             } catch (org.springframework.dao.DataIntegrityViolationException lostRace) {
                 // Another backend instance won the race to lease this Hub first (enforced by the
                 // job_leases_hub_id_unique DB constraint) - nothing to offer from this instance.
@@ -186,16 +184,17 @@ public class ExecutionService {
     }
 
     /**
-     * Renews whichever lease is currently active for the Hub, without requiring the Hub to echo
-     * the lease token back. Used by heartbeat handling on both transports so a Hub only needs to
-     * keep sending heartbeats (already required to stay ONLINE) to keep a long-running job's lease
-     * alive - it does not need to separately track and resend the lease token on every heartbeat.
-     * Returns {@code true} when a lease was found and renewed, {@code false} when the Hub has no
-     * active lease (nothing to renew - not an error).
+     * Renews whichever lease is currently active for the Hub on the given platform, without
+     * requiring the Hub to echo the lease token back. Used by heartbeat handling on both
+     * transports so a Hub only needs to keep sending heartbeats (already required to stay
+     * ONLINE) to keep a long-running job's lease alive - it does not need to separately track
+     * and resend the lease token on every heartbeat. Returns {@code true} when a lease was found
+     * and renewed, {@code false} when the Hub has no active lease for that platform (nothing to
+     * renew - not an error).
      */
-    public boolean renewActiveLease(UUID hubId) {
+    public boolean renewActiveLease(UUID hubId, String platform) {
         requireHubOnline(hubId);
-        return leaseService.renewActiveLease(hubId);
+        return leaseService.renewActiveLease(hubId, platform);
     }
 
     /**
@@ -328,30 +327,31 @@ public class ExecutionService {
     private record RunningExecution(UUID id, Instant startedAt) {
     }
 
+    /**
+     * Checks that the Hub identity itself is connected on at least one platform - used by
+     * {@link #renewLease}/{@link #renewActiveLease}, which don't need a specific platform to
+     * know the Hub is online (the lease/token lookup itself is already platform-scoped).
+     */
     private void requireHubOnline(UUID hubId) {
-        String status = jdbcTemplate.query("SELECT connection_status FROM hubs WHERE id = ?",
-                rs -> rs.next() ? rs.getString("connection_status") : null, hubId);
-        if (!"ONLINE".equals(status)) {
+        Integer onlinePlatformCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM hub_platforms WHERE hub_id = ? AND connection_status = 'ONLINE'",
+                Integer.class, hubId);
+        if (onlinePlatformCount == null || onlinePlatformCount == 0) {
             throw new HubNotOnlineException(hubId);
         }
     }
 
     /**
-     * Same online check as {@link #requireHubOnline}, plus the Hub's own reported platform so
-     * {@link #offerNextJob} can restrict dispatch to executions matching it (see
-     * {@link LeaseService#nextOfferableExecution}).
+     * Checks that this specific (hub, platform) pair is online, so {@link #offerNextJob} only
+     * dispatches to a Hub that has actually connected for that platform.
      */
-    private String requireHubOnlineAndGetPlatform(UUID hubId) {
-        HubStatusRow row = jdbcTemplate.query("SELECT connection_status, platform FROM hubs WHERE id = ?",
-                rs -> rs.next() ? new HubStatusRow(rs.getString("connection_status"), rs.getString("platform")) : null,
-                hubId);
-        if (row == null || !"ONLINE".equals(row.connectionStatus())) {
+    private void requireHubPlatformOnline(UUID hubId, String platform) {
+        String connectionStatus = jdbcTemplate.query(
+                "SELECT connection_status FROM hub_platforms WHERE hub_id = ? AND platform = ?",
+                rs -> rs.next() ? rs.getString("connection_status") : null, hubId, platform);
+        if (!"ONLINE".equals(connectionStatus)) {
             throw new HubNotOnlineException(hubId);
         }
-        return row.platform();
-    }
-
-    private record HubStatusRow(String connectionStatus, String platform) {
     }
 
     private HubEnvelopeV1 buildJobOfferedEnvelope(UUID executionId, UUID leaseToken) {
