@@ -54,7 +54,7 @@ public class TestPlanService {
             throw new RevisionConflictException(operation.getRevision());
         }
         requireFullyPassedValidation(operationId, revision);
-        String catalogVersion = templateReadinessValidator.catalogVersion();
+        String catalogVersion = templateReadinessValidator.catalogVersion("ANDROID");
 
         UUID planId = UUID.randomUUID();
         List<TestCaseDto> cases = createCases(operation, planId);
