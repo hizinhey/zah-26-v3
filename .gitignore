@@ -12,6 +12,9 @@ mobile_script/
 # Isolated implementation worktrees
 .worktrees/
 
+# Subagent-driven-development scratch workspace (ledgers, briefs, reports)
+.superpowers/
+
 # Secrets and local configuration
 .env
 .env.*
