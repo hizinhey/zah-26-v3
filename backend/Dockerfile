@@ -43,10 +43,11 @@ WORKDIR /opt/opshub
 
 COPY --from=build /workspace/app.jar /opt/opshub/app.jar
 
-# Tracked, checksum-verified Android template catalog (Task 5) — mounted
+# Tracked, checksum-verified Android and Web template catalogs — mounted
 # read-only at runtime so FileSystemTemplateReadinessValidator can render
-# and type-check each of the five controlled templates.
+# and type-check each of the five controlled templates per platform.
 COPY local-hub/templates/android /opt/opshub/templates/android
+COPY local-hub/templates/web /opt/opshub/templates/web
 
 # Pinned template-compiler tooling (TypeScript + WebdriverIO ambient
 # types). Installed once at image build time so no dependency resolution
@@ -60,10 +61,12 @@ RUN mkdir -p /var/lib/opshub/evidence \
     && chown -R opshub:opshub /opt/opshub /var/lib/opshub
 
 ENV OPSHUB_TEMPLATE_ROOT=/opt/opshub/templates/android \
+    OPSHUB_WEB_TEMPLATE_ROOT=/opt/opshub/templates/web \
     OPSHUB_NODE_EXECUTABLE=/usr/bin/node \
     OPSHUB_TSC_ENTRY=/opt/opshub/tooling/node_modules/typescript/lib/tsc.js \
     OPSHUB_TSC_TIMEOUT=30s \
     OPSHUB_TEMPLATE_CATALOG_VERSION=android-v1 \
+    OPSHUB_WEB_TEMPLATE_CATALOG_VERSION=web-v1 \
     OPSHUB_EVIDENCE_ROOT=/var/lib/opshub/evidence
 
 USER opshub

@@ -29,6 +29,8 @@ opshub:
     templates:
       catalog-version: ${OPSHUB_TEMPLATE_CATALOG_VERSION:android-v1}
       template-root: ${OPSHUB_TEMPLATE_ROOT:local-hub/templates/android}
+      web-catalog-version: ${OPSHUB_WEB_TEMPLATE_CATALOG_VERSION:web-v1}
+      web-template-root: ${OPSHUB_WEB_TEMPLATE_ROOT:local-hub/templates/web}
       node-executable: ${OPSHUB_NODE_EXECUTABLE:}
       tsc-entry: ${OPSHUB_TSC_ENTRY:}
       compiler-timeout: ${OPSHUB_TSC_TIMEOUT:30s}
