@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from opshub_hub.preflight import ProcessResult, run_preflight
+from opshub_hub.preflight import ProcessResult, run_preflight, run_web_preflight
 from opshub_hub.templates import TemplateIntegrityError
 
 TEMPLATE_ROOT = Path(__file__).resolve().parents[1] / "templates" / "android"
+WEB_TEMPLATE_ROOT = Path(__file__).resolve().parents[1] / "templates" / "web"
 
 
 def _happy_run_command(args, timeout=10.0):
@@ -127,3 +128,47 @@ def test_unwritable_data_root_fails_check(tmp_path, monkeypatch):
         assert report.ok is False
     finally:
         unwritable.chmod(0o700)
+
+
+def test_web_preflight_passes_when_node_present_and_profile_exists(tmp_path):
+    profile_dir = tmp_path / "chrome-profile"
+    profile_dir.mkdir()
+
+    def run_command(args, timeout=10.0):
+        if args[-1] == "--version":
+            return ProcessResult(returncode=0, stdout="v24.0.0\n")
+        raise AssertionError(f"unexpected command {args}")
+
+    report = run_web_preflight(
+        template_root=WEB_TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        chrome_profile_dir=profile_dir,
+        run_command=run_command,
+        catalog_factory=lambda root: _OkCatalog(),
+    )
+
+    assert report.ok is True
+    names = {check.name for check in report.checks}
+    assert "executable:node" in names
+    assert "chrome-profile-exists" in names
+    assert "template-manifest-checksum" in names
+    assert "writable:data-root" in names
+    assert "adb-device-state" not in names
+    assert "appium-reachable" not in names
+
+
+def test_web_preflight_fails_when_chrome_profile_directory_is_missing(tmp_path):
+    def run_command(args, timeout=10.0):
+        return ProcessResult(returncode=0, stdout="v24.0.0\n")
+
+    report = run_web_preflight(
+        template_root=WEB_TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        chrome_profile_dir=tmp_path / "does-not-exist",
+        run_command=run_command,
+        catalog_factory=lambda root: _OkCatalog(),
+    )
+
+    assert report.ok is False
+    failure = next(check for check in report.failures() if check.name == "chrome-profile-exists")
+    assert "does-not-exist" in failure.detail

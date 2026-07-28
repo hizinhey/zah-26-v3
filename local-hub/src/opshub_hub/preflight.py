@@ -134,3 +134,54 @@ def run_preflight(
             report.checks.append(CheckResult(name=f"writable:{name}", ok=False, detail=str(exc)))
 
     return report
+
+
+def run_web_preflight(
+    *,
+    template_root: Path,
+    data_root: Path,
+    chrome_profile_dir: Path,
+    required_executables: tuple[str, ...] = ("node",),
+    run_command: CommandRunner = _default_run_command,
+    catalog_factory: Callable[[Path], TemplateCatalog] = TemplateCatalog,
+) -> PreflightReport:
+    """Preflight for the Web (WebdriverIO + Chrome) execution path: no adb, no Appium,
+    no mobile device - Chrome resolves its own driver, and login is a pre-provisioned
+    profile directory rather than a live device."""
+    report = PreflightReport()
+
+    for executable in required_executables:
+        try:
+            result = run_command([executable, "--version"], timeout=10.0)
+            ok = result.returncode == 0
+            detail = result.stdout.strip() or result.stderr.strip()
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            ok = False
+            detail = str(exc)
+        report.checks.append(CheckResult(name=f"executable:{executable}", ok=ok, detail=detail))
+
+    profile_ok = chrome_profile_dir.is_dir()
+    report.checks.append(CheckResult(
+        name="chrome-profile-exists",
+        ok=profile_ok,
+        detail="" if profile_ok else f"Chrome profile directory not found: {chrome_profile_dir} "
+                                      "(complete the one-time manual QR login first)",
+    ))
+
+    try:
+        catalog = catalog_factory(template_root)
+        catalog.verify()
+        report.checks.append(CheckResult(name="template-manifest-checksum", ok=True))
+    except TemplateIntegrityError as exc:
+        report.checks.append(CheckResult(name="template-manifest-checksum", ok=False, detail=str(exc)))
+
+    try:
+        data_root.mkdir(parents=True, exist_ok=True)
+        probe_file = data_root / ".preflight-write-check"
+        probe_file.write_text("ok")
+        probe_file.unlink()
+        report.checks.append(CheckResult(name="writable:data-root", ok=True))
+    except OSError as exc:
+        report.checks.append(CheckResult(name="writable:data-root", ok=False, detail=str(exc)))
+
+    return report
