@@ -25,7 +25,7 @@ class WebSocketTransport:
         try:
             self._connection = connect(
                 self._config.websocket_url,
-                additional_headers={"X-Hub-Token": self._config.hub_token},
+                additional_headers={"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._config.platform},
                 open_timeout=self._connect_timeout,
             )
         except Exception as exc:  # noqa: BLE001 - any connect failure is a transport failure

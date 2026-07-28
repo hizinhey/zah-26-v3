@@ -40,7 +40,8 @@ values:
 | `OPSHUB_HUB_TOKEN` | Shared bearer token presented on every Hub-facing request (`X-Hub-Token` header / WebSocket `token` query param). Must match `OPSHUB_HUB_TOKEN` in `deploy/env/backend.env` on the backend side |
 | `OPSHUB_TEMPLATE_DIR` | Path to the WebdriverIO template catalog (`local-hub/templates/android` in this repo) |
 | `OPSHUB_WORK_DIR` | Writable data root for the Outbox database, rendered specs, evidence staging, and journal |
-| `OPSHUB_WDIO_PROJECT_DIR` | A real, installed WebdriverIO project (`wdio.conf.ts`, `tsconfig.json`, `node_modules`) that every execution's rendered spec is run against — e.g. this repo's `mobile_script/` directory, installed locally per runner host, never committed. Without this the runner has no config or dependencies to run a spec with |
+| `OPSHUB_PLATFORM` | Optional; `ANDROID` (default) or `WEB`. Selects preflight profile, Runner wiring, and which config file (`wdio.conf.ts` vs `wdio.web.conf.ts`) is materialized into every execution directory — see section 4 for `WEB` |
+| `OPSHUB_WDIO_PROJECT_DIR` | A real, installed WebdriverIO project — required for **both** platforms, since a WEB Hub needs the same pinned Node/dependencies as ANDROID, just a different config file inside the same project root: `wdio.conf.ts` (ANDROID) and/or `wdio.web.conf.ts` (WEB), plus `tsconfig.json`, `node_modules` — e.g. this repo's `mobile_script/` directory, installed locally per runner host, never committed. Without this the runner has no config or dependencies to run a spec with |
 | `OPSHUB_NODE_EXECUTABLE` | Node.js 20+ binary used to run the pinned WebdriverIO CLI directly, bypassing whatever `node` (if any, and whatever version) happens to be first on `PATH` |
 
 Related, but not read by the Hub process itself:
@@ -98,10 +99,11 @@ disabled by default) rather than it running as an always-on service.
 
 One-time setup on the host that will run it:
 
-1. Provision a Node project containing `wdio.web.conf.ts` at its root,
-   alongside the existing `wdio.conf.ts` used for Android (same
-   `node_modules`/`package.json`, WebdriverIO v9 manages its own matching
-   chromedriver — no separate driver install needed). `wdio.web.conf.ts`
+1. Provision the Node project that `OPSHUB_WDIO_PROJECT_DIR` (section 2)
+   points at so it contains `wdio.web.conf.ts` at its root, alongside the
+   existing `wdio.conf.ts` used for Android (same `node_modules`/
+   `package.json`, WebdriverIO v9 manages its own matching chromedriver —
+   no separate driver install needed). `wdio.web.conf.ts`
    needs a plain `browserName: 'chrome'` capability with
    `'goog:chromeOptions': { args: ['--user-data-dir=<profile-dir>'] } }`,
    `maxInstances: 1`, and an `afterTest` hook that writes
@@ -118,15 +120,19 @@ One-time setup on the host that will run it:
 3. Set `opshub.web-worker.enabled=true` and the rest of the
    `opshub.web-worker.*` properties (`python-executable`,
    `working-directory` — the Local Hub checkout with its Python venv
-   already installed — `hub-id`, `backend-url`, `template-root` pointing
-   at `local-hub/templates/web`, `data-root`) on the backend.
+   already installed — `hub-id` — **must be a real UUID string** the
+   backend's `hubs` table can key on, the default `web-worker` is a
+   placeholder that will fail to connect — `backend-url`, `template-root`
+   pointing at `local-hub/templates/web`, `data-root`) on the backend.
 
-Unlike Android, this Hub isn't started manually or kept running — the
-backend launches it (`WebWorkerLauncher`) the first time an operator starts
-an execution against a `WEB`-platform Operation, and it exits once that
-job completes. Sequential only: a second Web execution can't start while
-one is already running, the same way a second execution against a
-busy/leased Hub is rejected today.
+Unlike Android, this Hub isn't started manually — the backend launches it
+(`WebWorkerLauncher`) the first time an operator starts an execution
+against a `WEB`-platform Operation, then it keeps running its normal poll
+loop exactly like a manually started Android Hub (`WebWorkerLauncher` only
+guards against launching a second worker process while one is already
+alive). Sequential only: only one Web worker process runs at a time, so a
+second Web execution is queued and served once the first job's lease is
+released, the same lease mechanism every Hub already uses.
 
 ## 5. Starting Appium
 

@@ -10,7 +10,7 @@ import threading
 import time
 
 from opshub_hub.appium_control import AdbScreenshotCapturer, AppiumSessionResetter
-from opshub_hub.browser_control import WebScreenshotCapturer, web_command_builder
+from opshub_hub.browser_control import WebScreenshotCapturer
 from opshub_hub.config import HubConfig, load_config
 from opshub_hub.evidence import HttpEvidenceUploader
 from opshub_hub.journal import ExecutionJournal
@@ -67,6 +67,13 @@ def build_web_runner(config: HubConfig, transport: FailoverTransport, outbox: Ou
     catalog = TemplateCatalog(config.template_root)
     execution_root = config.data_root / "executions"
     evidence_uploader = HttpEvidenceUploader(base_url=config.backend_url, hub_token=config.hub_token)
+    # Mirrors build_runner's Node-version fix exactly, just against wdio.web.conf.ts instead of
+    # wdio.conf.ts: without a pinned node_executable/wdio_project_root, there is no config file or
+    # dependencies in the execution directory for `wdio` to run against at all (see
+    # templates.materialize_execution_dir and runner.build_wdio_command_builder).
+    command_builder = build_wdio_command_builder(
+        config.node_executable, config.wdio_project_root, config_filename="wdio.web.conf.ts"
+    )
     return Runner(
         catalog=catalog,
         execution_root=execution_root,
@@ -76,7 +83,9 @@ def build_web_runner(config: HubConfig, transport: FailoverTransport, outbox: Ou
         evidence_uploader=evidence_uploader,
         screenshot_capturer=WebScreenshotCapturer(),
         reset_appium_session=None,
-        command_builder=web_command_builder,
+        command_builder=command_builder,
+        wdio_project_root=config.wdio_project_root,
+        wdio_config_filename="wdio.web.conf.ts",
     )
 
 
@@ -145,7 +154,13 @@ def run_forever(config: HubConfig | None = None) -> None:
     if config.platform == "WEB":
         chrome_profile_dir = config.data_root / "chrome-profile"
         preflight = run_web_preflight(
-            template_root=config.template_root, data_root=config.data_root, chrome_profile_dir=chrome_profile_dir
+            template_root=config.template_root,
+            data_root=config.data_root,
+            chrome_profile_dir=chrome_profile_dir,
+            # Same reasoning as the ANDROID branch below: check the pinned Node executable
+            # itself, not whatever "node" resolves to on PATH.
+            required_executables=(str(config.node_executable),),
+            wdio_project_root=config.wdio_project_root,
         )
     else:
         preflight = run_preflight(

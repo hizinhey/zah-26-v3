@@ -86,7 +86,7 @@ class PollingTransport:
         self._client.close()
 
     def _headers(self) -> dict:
-        return {"X-Hub-Token": self._config.hub_token}
+        return {"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._config.platform}
 
     def _heartbeat_envelope(self) -> dict:
         return {

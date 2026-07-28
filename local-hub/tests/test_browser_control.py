@@ -1,15 +1,6 @@
-from pathlib import Path
-
 import pytest
 
-from opshub_hub.browser_control import WebScreenshotCapturer, web_command_builder
-
-
-def test_web_command_builder_runs_wdio_with_the_web_config():
-    command = web_command_builder(Path("/exec/tests/web-oa-delivery-v1.spec.ts"))
-    assert command == [
-        "npx", "wdio", "run", "wdio.web.conf.ts", "--spec", "/exec/tests/web-oa-delivery-v1.spec.ts",
-    ]
+from opshub_hub.browser_control import WebScreenshotCapturer
 
 
 def test_screenshot_capturer_moves_the_fixed_screenshot_to_the_requested_destination(tmp_path):

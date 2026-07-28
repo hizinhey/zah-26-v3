@@ -1,17 +1,13 @@
-"""Web (WebdriverIO + Chrome) counterparts to appium_control.py's Android hooks -
-command building and evidence capture for the Web execution path, which has no adb
-and no Appium server to talk to."""
+"""Web (WebdriverIO + Chrome) counterpart to appium_control.py's Android hooks -
+evidence capture for the Web execution path, which has no adb and no Appium server to
+talk to. Command building for Web uses the same pinned-Node/pinned-project mechanism as
+Android (see `runner.build_wdio_command_builder`, `main.build_web_runner`) rather than a
+Web-specific builder - `npx` with no pinned project/Node cannot find a config file to
+run and has no guarantee of a new-enough `node` on `PATH`."""
 
 from __future__ import annotations
 
 from pathlib import Path
-
-
-def web_command_builder(spec_path: Path) -> list[str]:
-    """Matches Runner's `command_builder: Callable[[Path], list[str]]`. Assumes
-    wdio.web.conf.ts is present in the job's working directory (Runner sets `cwd` to
-    `spec_path.parent.parent`), the same way the Android path assumes wdio.conf.ts is."""
-    return ["npx", "wdio", "run", "wdio.web.conf.ts", "--spec", str(spec_path)]
 
 
 class WebScreenshotCapturer:

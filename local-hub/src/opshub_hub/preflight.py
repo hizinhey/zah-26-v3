@@ -65,6 +65,26 @@ def _default_probe(url: str, timeout: float = 5.0) -> bool:
         return False
 
 
+def _wdio_project_check(wdio_project_root: Path, config_filename: str) -> CheckResult:
+    """Shared by run_preflight (config_filename='wdio.conf.ts') and run_web_preflight
+    (config_filename='wdio.web.conf.ts') - both platforms need the same pinned, installed
+    WebdriverIO project, just a different config file inside it (see
+    templates.materialize_execution_dir)."""
+    missing = [
+        name
+        for name in (config_filename, "tsconfig.json", "node_modules")
+        if not (wdio_project_root / name).exists()
+    ]
+    wdio_bin = wdio_project_root / "node_modules" / ".bin" / "wdio"
+    if not missing and not wdio_bin.exists():
+        missing.append("node_modules/.bin/wdio")
+    return CheckResult(
+        name="wdio-project-installed",
+        ok=not missing,
+        detail=f"missing under {wdio_project_root}: {', '.join(missing)}" if missing else "",
+    )
+
+
 def run_preflight(
     *,
     template_root: Path,
@@ -125,21 +145,7 @@ def run_preflight(
         report.checks.append(CheckResult(name="template-manifest-checksum", ok=False, detail=str(exc)))
 
     if wdio_project_root is not None:
-        missing = [
-            name
-            for name in ("wdio.conf.ts", "tsconfig.json", "node_modules")
-            if not (wdio_project_root / name).exists()
-        ]
-        wdio_bin = wdio_project_root / "node_modules" / ".bin" / "wdio"
-        if not missing and not wdio_bin.exists():
-            missing.append("node_modules/.bin/wdio")
-        report.checks.append(
-            CheckResult(
-                name="wdio-project-installed",
-                ok=not missing,
-                detail=f"missing under {wdio_project_root}: {', '.join(missing)}" if missing else "",
-            )
-        )
+        report.checks.append(_wdio_project_check(wdio_project_root, "wdio.conf.ts"))
 
     for name, directory in (("data-root", data_root),):
         try:
@@ -162,6 +168,7 @@ def run_web_preflight(
     required_executables: tuple[str, ...] = ("node",),
     run_command: CommandRunner = _default_run_command,
     catalog_factory: Callable[[Path], TemplateCatalog] = TemplateCatalog,
+    wdio_project_root: Path | None = None,
 ) -> PreflightReport:
     """Preflight for the Web (WebdriverIO + Chrome) execution path: no adb, no Appium,
     no mobile device - Chrome resolves its own driver, and login is a pre-provisioned
@@ -192,6 +199,9 @@ def run_web_preflight(
         report.checks.append(CheckResult(name="template-manifest-checksum", ok=True))
     except TemplateIntegrityError as exc:
         report.checks.append(CheckResult(name="template-manifest-checksum", ok=False, detail=str(exc)))
+
+    if wdio_project_root is not None:
+        report.checks.append(_wdio_project_check(wdio_project_root, "wdio.web.conf.ts"))
 
     try:
         data_root.mkdir(parents=True, exist_ok=True)

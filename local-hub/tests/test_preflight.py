@@ -44,9 +44,9 @@ def test_all_checks_pass_when_everything_is_healthy(tmp_path):
     )
 
 
-def _make_installed_wdio_project(root: Path) -> Path:
+def _make_installed_wdio_project(root: Path, config_filename: str = "wdio.conf.ts") -> Path:
     root.mkdir()
-    (root / "wdio.conf.ts").write_text("export const config = {};")
+    (root / config_filename).write_text("export const config = {};")
     (root / "tsconfig.json").write_text("{}")
     bin_dir = root / "node_modules" / ".bin"
     bin_dir.mkdir(parents=True)
@@ -222,3 +222,52 @@ def test_web_preflight_fails_when_chrome_profile_directory_is_missing(tmp_path):
     assert report.ok is False
     failure = next(check for check in report.failures() if check.name == "chrome-profile-exists")
     assert "does-not-exist" in failure.detail
+
+
+def test_web_preflight_wdio_project_check_passes_when_wdio_web_conf_installed(tmp_path):
+    profile_dir = tmp_path / "chrome-profile"
+    profile_dir.mkdir()
+    wdio_project_root = _make_installed_wdio_project(tmp_path / "wdio-project", config_filename="wdio.web.conf.ts")
+
+    def run_command(args, timeout=10.0):
+        return ProcessResult(returncode=0, stdout="v24.0.0\n")
+
+    report = run_web_preflight(
+        template_root=WEB_TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        chrome_profile_dir=profile_dir,
+        run_command=run_command,
+        catalog_factory=lambda root: _OkCatalog(),
+        wdio_project_root=wdio_project_root,
+    )
+
+    check = next(c for c in report.checks if c.name == "wdio-project-installed")
+    assert check.ok is True
+    assert report.ok is True
+
+
+def test_web_preflight_wdio_project_check_fails_when_wdio_web_conf_missing(tmp_path):
+    profile_dir = tmp_path / "chrome-profile"
+    profile_dir.mkdir()
+    wdio_project_root = tmp_path / "wdio-project"
+    wdio_project_root.mkdir()
+    # wdio.web.conf.ts deliberately absent (e.g. only the ANDROID wdio.conf.ts was provisioned).
+    (wdio_project_root / "tsconfig.json").write_text("{}")
+    (wdio_project_root / "node_modules").mkdir()
+
+    def run_command(args, timeout=10.0):
+        return ProcessResult(returncode=0, stdout="v24.0.0\n")
+
+    report = run_web_preflight(
+        template_root=WEB_TEMPLATE_ROOT,
+        data_root=tmp_path / "data",
+        chrome_profile_dir=profile_dir,
+        run_command=run_command,
+        catalog_factory=lambda root: _OkCatalog(),
+        wdio_project_root=wdio_project_root,
+    )
+
+    check = next(c for c in report.checks if c.name == "wdio-project-installed")
+    assert check.ok is False
+    assert "wdio.web.conf.ts" in check.detail
+    assert report.ok is False

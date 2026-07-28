@@ -94,15 +94,18 @@ def default_command_builder(spec_path: Path) -> list[str]:
     return ["npx", "wdio", "run", "wdio.conf.ts", "--spec", str(spec_path)]
 
 
-def build_wdio_command_builder(node_executable: Path, wdio_project_root: Path) -> Callable[[Path], list[str]]:
+def build_wdio_command_builder(
+    node_executable: Path, wdio_project_root: Path, config_filename: str = "wdio.conf.ts"
+) -> Callable[[Path], list[str]]:
     """Builds the real command: the pinned `node_executable` running the pinned project's own
     `node_modules/.bin/wdio` CLI script directly (bypassing `npx` and any cold install/bootstrap)
-    against the `wdio.conf.ts` that `materialize_execution_dir` copies into every execution
-    directory, targeting exactly the one freshly rendered spec for this attempt."""
+    against the `config_filename` that `materialize_execution_dir` copies into every execution
+    directory (`wdio.conf.ts` for ANDROID, `wdio.web.conf.ts` for WEB - see that function's
+    docstring), targeting exactly the one freshly rendered spec for this attempt."""
     wdio_bin = wdio_project_root / "node_modules" / ".bin" / "wdio"
 
     def build(spec_path: Path) -> list[str]:
-        return [str(node_executable), str(wdio_bin), "run", "wdio.conf.ts", "--spec", str(spec_path)]
+        return [str(node_executable), str(wdio_bin), "run", config_filename, "--spec", str(spec_path)]
 
     return build
 
@@ -128,6 +131,7 @@ class Runner:
         reset_appium_session: AppiumSessionResetter | None = None,
         command_builder: Callable[[Path], list[str]] = default_command_builder,
         wdio_project_root: Path | None = None,
+        wdio_config_filename: str = "wdio.conf.ts",
         spec_timeout: float = 300.0,
         clock: Callable[[], float] = time.monotonic,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -142,6 +146,7 @@ class Runner:
         self._reset_appium_session = reset_appium_session
         self._command_builder = command_builder
         self._wdio_project_root = wdio_project_root
+        self._wdio_config_filename = wdio_config_filename
         self._spec_timeout = spec_timeout
         self._clock = clock
         self._now = now
@@ -149,7 +154,11 @@ class Runner:
     def run(self, job: JobOfferedPayload) -> ExecutionSummary:
         execution_dir = self._execution_root / str(job.executionId)
         spec_paths = materialize_execution_dir(
-            self._catalog, execution_dir, job.testCases, wdio_project_root=self._wdio_project_root
+            self._catalog,
+            execution_dir,
+            job.testCases,
+            wdio_project_root=self._wdio_project_root,
+            config_filename=self._wdio_config_filename,
         )
         logs_dir = execution_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)

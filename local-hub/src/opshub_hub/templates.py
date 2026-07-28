@@ -95,20 +95,24 @@ def materialize_execution_dir(
     execution_dir: Path,
     test_cases: list,
     wdio_project_root: Path | None = None,
+    config_filename: str = "wdio.conf.ts",
 ) -> dict[str, Path]:
     """Render every test case's spec into a fresh execution directory alongside a
     copy of the shared page objects. Returns a mapping of testCaseId (str) -> spec
     file path, in the same order as `test_cases`.
 
-    When `wdio_project_root` is given (a real WebdriverIO project - `wdio.conf.ts`,
+    When `wdio_project_root` is given (a real WebdriverIO project - `config_filename`,
     `tsconfig.json`, and an installed `node_modules` - see `OPSHUB_WDIO_PROJECT_DIR`),
     that project's config/tsconfig are copied in and its `node_modules` symlinked in,
     so the execution directory becomes a fully self-contained, runnable WebdriverIO
     project: a spec here can `import` its page objects (resolved relative to the spec
-    file) and page objects/wdio.conf.ts can resolve `node_modules` packages (resolved
+    file) and page objects/config file can resolve `node_modules` packages (resolved
     by walking up from each importing file), all without ever touching the shared
-    project directory concurrently. This mirrors the exact symlink-and-render pattern
-    already validated by
+    project directory concurrently. `config_filename` lets the same project root serve
+    both platforms' Hub processes - `wdio.conf.ts` for ANDROID, `wdio.web.conf.ts` for
+    WEB - since each Local Hub process only ever runs one platform at a time (see
+    `main.build_runner`/`main.build_web_runner`). This mirrors the exact
+    symlink-and-render pattern already validated by
     `local-hub/tests/templates/test_template_catalog.py::test_rendered_specs_typecheck_with_the_local_wdio_dependencies`.
     """
     execution_dir.mkdir(parents=True, exist_ok=True)
@@ -123,7 +127,7 @@ def materialize_execution_dir(
         node_modules_dst = execution_dir / "node_modules"
         if not node_modules_dst.exists():
             node_modules_dst.symlink_to(wdio_project_root / "node_modules", target_is_directory=True)
-        for filename in ("wdio.conf.ts", "tsconfig.json"):
+        for filename in (config_filename, "tsconfig.json"):
             destination = execution_dir / filename
             if not destination.exists():
                 shutil.copy2(wdio_project_root / filename, destination)

@@ -1,9 +1,11 @@
 """Typed Local Hub configuration.
 
 Loaded from environment variables (see local-hub/.env.example). `platform` is optional
-(defaults to ANDROID); `wdio_project_root`/`node_executable` are required only when
-`platform` is ANDROID. All other fields are required — the Hub refuses to start without
-a complete configuration.
+(defaults to ANDROID). All other fields, including `wdio_project_root`/`node_executable`,
+are required for both platforms — a WEB Hub needs the same pinned Node/WebdriverIO project
+as ANDROID, just a different config file inside it (`wdio.web.conf.ts` vs `wdio.conf.ts` -
+see `templates.materialize_execution_dir`). The Hub refuses to start without a complete
+configuration.
 """
 
 from __future__ import annotations
@@ -24,15 +26,15 @@ class HubConfig(BaseModel):
     template_root: Path
     data_root: Path
     platform: Literal["ANDROID", "WEB"] = "ANDROID"
-    wdio_project_root: Path | None = None
-    """A real, installed WebdriverIO project (`wdio.conf.ts`, `tsconfig.json`, `node_modules`)
-    that every ANDROID execution's rendered spec is run against - see `OPSHUB_WDIO_PROJECT_DIR`.
-    Required when platform is ANDROID; unused for WEB. Without this, the runner has no config
-    file or dependencies to actually run a spec with."""
-    node_executable: Path | None = None
+    wdio_project_root: Path
+    """A real, installed WebdriverIO project (`wdio.conf.ts`, `wdio.web.conf.ts`, `tsconfig.json`,
+    `node_modules`) that every execution's rendered spec is run against - see
+    `OPSHUB_WDIO_PROJECT_DIR`. Without this, the runner has no config file or dependencies to
+    actually run a spec with."""
+    node_executable: Path
     """Node.js binary (>=20) used to run the pinned WebdriverIO CLI directly, bypassing `npx`
     and whatever `node` (if any, and whatever version) happens to be first on `PATH` - see
-    `OPSHUB_NODE_EXECUTABLE`. Required when platform is ANDROID; unused for WEB."""
+    `OPSHUB_NODE_EXECUTABLE`."""
 
     @property
     def websocket_url(self) -> str:
@@ -66,9 +68,6 @@ _ENV_MAP = {
     "hub_token": "OPSHUB_HUB_TOKEN",
     "template_root": "OPSHUB_TEMPLATE_DIR",
     "data_root": "OPSHUB_WORK_DIR",
-}
-
-_ANDROID_ENV_MAP = {
     "wdio_project_root": "OPSHUB_WDIO_PROJECT_DIR",
     "node_executable": "OPSHUB_NODE_EXECUTABLE",
 }
@@ -81,14 +80,6 @@ def load_config(env: dict | None = None) -> HubConfig:
     if missing:
         raise ValueError(f"Missing required Local Hub environment variables: {', '.join(missing)}")
     platform = source.get("OPSHUB_PLATFORM") or "ANDROID"
-    wdio_project_root = None
-    node_executable = None
-    if platform == "ANDROID":
-        android_missing = [name for name in _ANDROID_ENV_MAP.values() if not source.get(name)]
-        if android_missing:
-            raise ValueError(f"Missing required Local Hub environment variables: {', '.join(android_missing)}")
-        wdio_project_root = Path(source[_ANDROID_ENV_MAP["wdio_project_root"]])
-        node_executable = Path(source[_ANDROID_ENV_MAP["node_executable"]])
     return HubConfig(
         backend_url=source[_ENV_MAP["backend_url"]],
         hub_id=source[_ENV_MAP["hub_id"]],
@@ -96,6 +87,6 @@ def load_config(env: dict | None = None) -> HubConfig:
         template_root=Path(source[_ENV_MAP["template_root"]]),
         data_root=Path(source[_ENV_MAP["data_root"]]),
         platform=platform,
-        wdio_project_root=wdio_project_root,
-        node_executable=node_executable,
+        wdio_project_root=Path(source[_ENV_MAP["wdio_project_root"]]),
+        node_executable=Path(source[_ENV_MAP["node_executable"]]),
     )

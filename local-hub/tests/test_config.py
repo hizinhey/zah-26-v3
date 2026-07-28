@@ -1,3 +1,5 @@
+import pytest
+
 from opshub_hub.config import load_config
 
 
@@ -18,8 +20,8 @@ def _base_env(**overrides):
 def test_platform_defaults_to_android_when_unset():
     config = load_config(_base_env())
     assert config.platform == "ANDROID"
-    assert config.wdio_project_root is not None
-    assert config.node_executable is not None
+    assert str(config.wdio_project_root) == "/tmp/wdio-project"
+    assert str(config.node_executable) == "/usr/bin/node"
 
 
 def test_platform_reads_from_env_when_set():
@@ -27,24 +29,11 @@ def test_platform_reads_from_env_when_set():
     assert config.platform == "WEB"
 
 
-def test_android_platform_requires_wdio_project_and_node_executable_env_vars():
-    env = _base_env()
-    del env["OPSHUB_WDIO_PROJECT_DIR"]
-    del env["OPSHUB_NODE_EXECUTABLE"]
+def test_both_platforms_require_wdio_project_and_node_executable_env_vars():
+    for platform_overrides in ({}, {"OPSHUB_PLATFORM": "WEB"}):
+        env = _base_env(**platform_overrides)
+        del env["OPSHUB_WDIO_PROJECT_DIR"]
+        del env["OPSHUB_NODE_EXECUTABLE"]
 
-    import pytest
-
-    with pytest.raises(ValueError, match="OPSHUB_WDIO_PROJECT_DIR"):
-        load_config(env)
-
-
-def test_web_platform_does_not_require_wdio_project_or_node_executable_env_vars():
-    env = _base_env(OPSHUB_PLATFORM="WEB")
-    del env["OPSHUB_WDIO_PROJECT_DIR"]
-    del env["OPSHUB_NODE_EXECUTABLE"]
-
-    config = load_config(env)
-
-    assert config.platform == "WEB"
-    assert config.wdio_project_root is None
-    assert config.node_executable is None
+        with pytest.raises(ValueError, match="OPSHUB_WDIO_PROJECT_DIR"):
+            load_config(env)

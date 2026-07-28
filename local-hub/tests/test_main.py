@@ -98,7 +98,9 @@ def test_heartbeat_keeps_firing_while_a_simulated_long_running_job_blocks():
     )
 
 
-def test_build_web_runner_uses_the_web_command_builder_and_screenshot_capturer(tmp_path):
+def test_build_web_runner_uses_the_pinned_wdio_web_conf_and_screenshot_capturer(tmp_path):
+    wdio_project_root = tmp_path / "wdio-project"
+    wdio_project_root.mkdir()
     config = HubConfig(
         backend_url="https://backend.example.test",
         hub_id="hub-1",
@@ -106,6 +108,8 @@ def test_build_web_runner_uses_the_web_command_builder_and_screenshot_capturer(t
         template_root=Path(__file__).resolve().parents[1] / "templates" / "web",
         data_root=tmp_path,
         platform="WEB",
+        wdio_project_root=wdio_project_root,
+        node_executable=Path("/usr/bin/node"),
     )
     transport = FailoverTransport(ws_transport=_FakeTransport(), polling_transport=_FakeTransport())
     outbox = Outbox(tmp_path / "outbox.sqlite3")
@@ -114,4 +118,15 @@ def test_build_web_runner_uses_the_web_command_builder_and_screenshot_capturer(t
 
     assert runner._screenshot_capturer is not None
     assert runner._reset_appium_session is None
-    assert runner._command_builder(Path("/exec/tests/x.spec.ts"))[3] == "wdio.web.conf.ts"
+    assert runner._wdio_project_root == wdio_project_root, (
+        "build_web_runner must pass config.wdio_project_root through, or materialize_execution_dir "
+        "never copies wdio.web.conf.ts/tsconfig.json/node_modules into the execution directory"
+    )
+    assert runner._wdio_config_filename == "wdio.web.conf.ts"
+    command = runner._command_builder(Path("/exec/tests/x.spec.ts"))
+    assert command[0] == "/usr/bin/node", (
+        f"build_web_runner must use the pinned node_executable, not npx/PATH's node - got: {command}"
+    )
+    assert str(wdio_project_root / "node_modules" / ".bin" / "wdio") in command
+    assert "wdio.web.conf.ts" in command
+    assert "npx" not in command
