@@ -49,7 +49,7 @@ public class HubWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         UUID hubId = hubId(session);
         sessionsByHub.remove(hubId, session);
-        hubConnectionService.markOffline(hubId);
+        hubConnectionService.markOffline(hubId, platform(session));
     }
 
     @Override
