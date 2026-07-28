@@ -2,7 +2,6 @@ package com.opshub.execution;
 
 import com.opshub.execution.application.ExecutionService;
 import com.opshub.execution.application.LeaseService;
-import com.opshub.execution.application.WebWorkerLauncher;
 import com.opshub.hub.domain.HubEnvelopeV1;
 import com.opshub.hub.domain.HubPayloads;
 import org.junit.jupiter.api.Test;
@@ -50,7 +49,7 @@ class ExecutionServiceSweepUnitTest {
     void marksAnExecutionFailedWhenItStartedWellPastTheGracePeriodWithNoActivity() throws Exception {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         LeaseService leaseService = mock(LeaseService.class);
-        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService, mock(WebWorkerLauncher.class));
+        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService);
         UUID executionId = UUID.randomUUID();
         Instant startedAt = Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60);
         stubOneRunningExecution(jdbcTemplate, executionId, startedAt);
@@ -65,7 +64,7 @@ class ExecutionServiceSweepUnitTest {
     void leavesAnExecutionAloneWhenItStartedRecently() throws Exception {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         LeaseService leaseService = mock(LeaseService.class);
-        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService, mock(WebWorkerLauncher.class));
+        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService);
         UUID executionId = UUID.randomUUID();
         stubOneRunningExecution(jdbcTemplate, executionId, Instant.now());
 
@@ -89,13 +88,13 @@ class ExecutionServiceSweepUnitTest {
         // Simulates what a Hub's regular heartbeat does via renewActiveLease - kept entirely
         // separate from the sweep's own inputs to prove the sweep no longer looks at lease state
         // at all, which is the actual fix (see the class javadoc).
-        when(leaseService.renewActiveLease(any())).thenReturn(true);
-        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService, mock(WebWorkerLauncher.class));
+        when(leaseService.renewActiveLease(any(), anyString())).thenReturn(true);
+        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService);
         UUID executionId = UUID.randomUUID();
         Instant startedAt = Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60);
         stubOneRunningExecution(jdbcTemplate, executionId, startedAt);
 
-        assertThat(leaseService.renewActiveLease(UUID.randomUUID())).isTrue();
+        assertThat(leaseService.renewActiveLease(UUID.randomUUID(), "ANDROID")).isTrue();
         executionService.sweepAbandonedExecutions();
 
         verify(jdbcTemplate).update(contains("FAILED"), any(Timestamp.class), eq(executionId));
@@ -106,7 +105,7 @@ class ExecutionServiceSweepUnitTest {
     void leavesAnExecutionAloneWhenItHasRecentGenuineProgressDespiteStartingLongAgo() throws Exception {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         LeaseService leaseService = mock(LeaseService.class);
-        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService, mock(WebWorkerLauncher.class));
+        ExecutionService executionService = new ExecutionService(jdbcTemplate, leaseService);
         UUID executionId = UUID.randomUUID();
         Instant startedAt = Instant.now().minus(ExecutionService.ABANDONED_EXECUTION_GRACE_PERIOD).minusSeconds(60);
         stubOneRunningExecution(jdbcTemplate, executionId, startedAt);
