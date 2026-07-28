@@ -324,21 +324,31 @@ components:
         expectedRedirectDomain: { type: string, minLength: 1 }
     HubSummary:
       type: object
-      required: [id, name, connectionStatus, transport, platform, deviceReady, runnerReady, createdAt]
+      required: [id, name, createdAt, platforms]
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
         name:
           type: string
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
+        platforms:
+          type: array
+          items:
+            $ref: '#/components/schemas/HubPlatformStatus'
+    HubPlatformStatus:
+      type: object
+      required: [platform, connectionStatus, transport, deviceReady, runnerReady]
+      properties:
+        platform:
+          type: string
+          enum: [ANDROID, WEB]
         connectionStatus:
           type: string
           enum: [ONLINE, OFFLINE]
         transport:
           type: string
           enum: [WEBSOCKET, HTTPS_POLLING]
-        platform:
-          type: string
-          enum: [ANDROID, WEB]
         deviceReady:
           type: boolean
         runnerReady:
@@ -347,8 +357,6 @@ components:
           anyOf:
             - $ref: '#/components/schemas/Timestamp'
             - type: 'null'
-        createdAt:
-          $ref: '#/components/schemas/Timestamp'
     HubEnvelopeV1:
       oneOf:
         - $ref: '#/components/schemas/JobOfferedEnvelope'
