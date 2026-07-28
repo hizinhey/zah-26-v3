@@ -6,6 +6,10 @@ const BADGE_REGION_WIDTH_RATIO = 0.2;
 class MessagesTab {
   private readonly conversationListResourceId = 'com.zing.zalo:id/recycler_view_msgList';
 
+  private conversationByNameOnScreen(name: string) {
+    return $(`android=new UiSelector().textStartsWith("${name}")`);
+  }
+
   conversationByName(name: string) {
     return $(
       'android=new UiScrollable(new UiSelector()' +
@@ -15,6 +19,10 @@ class MessagesTab {
   }
 
   async findConversation(name: string) {
+    const onScreen = this.conversationByNameOnScreen(name);
+    if (await onScreen.isDisplayed().catch(() => false)) {
+      return onScreen;
+    }
     const conversation = this.conversationByName(name);
     await conversation.waitForDisplayed();
     return conversation;
