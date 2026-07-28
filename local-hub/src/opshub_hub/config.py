@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,6 +21,7 @@ class HubConfig(BaseModel):
     hub_token: str = Field(min_length=1)
     template_root: Path
     data_root: Path
+    platform: Literal["ANDROID", "WEB"] = "ANDROID"
 
     @property
     def websocket_url(self) -> str:
@@ -62,10 +64,12 @@ def load_config(env: dict | None = None) -> HubConfig:
     missing = [name for name in _ENV_MAP.values() if not source.get(name)]
     if missing:
         raise ValueError(f"Missing required Local Hub environment variables: {', '.join(missing)}")
+    platform = source.get("OPSHUB_PLATFORM") or "ANDROID"
     return HubConfig(
         backend_url=source[_ENV_MAP["backend_url"]],
         hub_id=source[_ENV_MAP["hub_id"]],
         hub_token=source[_ENV_MAP["hub_token"]],
         template_root=Path(source[_ENV_MAP["template_root"]]),
         data_root=Path(source[_ENV_MAP["data_root"]]),
+        platform=platform,
     )
