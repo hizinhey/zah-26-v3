@@ -25,7 +25,7 @@ On startup the Hub:
 2. Runs preflight checks (section 4). If any check fails, the Hub logs each
    failure and exits without attempting to run jobs.
 3. Connects to the backend, preferring the WebSocket transport and falling
-   back to HTTPS long-polling automatically (section 5).
+   back to HTTPS long-polling automatically (section 6).
 4. Begins sending heartbeats and waits for a job offer.
 
 ## 2. Environment variables
@@ -244,9 +244,9 @@ service without rebuilding).
 |---|---|---|
 | Hub won't start, missing config | check `local-hub/.env` has every variable in section 2 | the Hub refuses to start rather than run with partial config |
 | Preflight fails on `adb-device-state` | `adb kill-server && adb start-server && adb devices` | most common cause: device asleep, USB debugging revoked, or more/fewer than one device attached |
-| Preflight fails on `appium-reachable` | restart Appium (section 4), then re-run preflight | check nothing else is bound to port 4723 |
+| Preflight fails on `appium-reachable` | restart Appium (section 5), then re-run preflight | check nothing else is bound to port 4723 |
 | Preflight fails on `zalo-package-installed` | reinstall/re-verify the Zalo build on the device, confirm campaign preconditions and login are already in place per the test plan | out of scope for the Hub to remediate automatically |
 | Hub stuck on `HTTPS_POLLING`, never reconnects to WebSocket | check the backend/gateway WebSocket route is reachable (`curl -i` a WS upgrade against `/ws/v1/hubs/{hubId}`); check `OPSHUB_HUB_TOKEN` matches on both sides | failover retries WebSocket automatically every poll interval - no manual re-enable needed once the path is fixed |
-| Execution stuck `RUNNING` in the UI, Hub log shows nothing | check `hubs.connection_status`/`last_heartbeat_at` (section 5); if `OFFLINE`, the lease will expire and the job becomes offerable again automatically | do not manually clear the lease row; let the TTL expire |
+| Execution stuck `RUNNING` in the UI, Hub log shows nothing | check `hubs.connection_status`/`last_heartbeat_at` (section 6); if `OFFLINE`, the lease will expire and the job becomes offerable again automatically | do not manually clear the lease row; let the TTL expire |
 | Evidence upload failing repeatedly | check `OPSHUB_EVIDENCE_MAX_BYTES` on the backend against the local file size; check backend disk space under the evidence bind mount | local files are preserved until upload succeeds, so retrying later is always safe |
 | Need to re-run preflight only | see the standalone snippet in section 3 | does not require starting the full Hub loop |

@@ -106,7 +106,7 @@ that use fakes/mocks in place of the real device/Appium/backend:
 This step remains genuinely unexecuted against real hardware and must be
 run manually before sign-off, exactly as Tasks 6–8 flagged for
 Docker/Testcontainers-dependent coverage. See
-`docs/operations/local-hub-runbook.md` sections 3–4 for the manual
+`docs/operations/local-hub-runbook.md` sections 3 and 5 for the manual
 procedure (adb/Appium/Zalo preflight and how to start Appium).
 
 ## Step 4 — Visual fidelity for all four screens: MANUAL/STRUCTURAL ONLY

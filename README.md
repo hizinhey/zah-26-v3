@@ -92,7 +92,7 @@ started separately:
 appium --address 127.0.0.1 --port 4723
 ```
 
-See `docs/operations/local-hub-runbook.md` sections 3–4 for the full
+See `docs/operations/local-hub-runbook.md` sections 3 and 5 for the full
 preflight procedure, manual diagnostic commands, and recovery steps.
 
 ## Transport status
@@ -104,14 +104,14 @@ periodically until it reconnects. The browser (React frontend) side has no
 backend-provided WebSocket endpoint yet — a documented, deliberately
 deferred minor from Task 11 — so it always uses REST polling of
 `GET /api/v1/executions/{executionId}` and surfaces that state in the UI.
-See `docs/operations/local-hub-runbook.md` section 5.
+See `docs/operations/local-hub-runbook.md` section 6.
 
 ## Evidence cleanup
 
 Evidence (screenshots/logs) is written locally by the Hub and deleted only
 after the backend acknowledges the upload; a failed upload always leaves
 the local copy in place. Uploaded evidence lives under the backend's
-evidence bind mount. See `docs/operations/local-hub-runbook.md` section 6
+evidence bind mount. See `docs/operations/local-hub-runbook.md` section 7
 for cleanup commands.
 
 ## Database backup and service restart
@@ -122,7 +122,7 @@ docker compose -f deploy/compose.yaml exec -T postgres \
 docker compose -f deploy/compose.yaml restart backend   # or any single service
 ```
 
-See `docs/operations/local-hub-runbook.md` sections 7–9 for the full backup
+See `docs/operations/local-hub-runbook.md` sections 8–10 for the full backup
 procedure, service restart semantics, and a table of common recovery
 commands (device offline, Appium unreachable, stuck lease, failing evidence
 upload, etc.).
