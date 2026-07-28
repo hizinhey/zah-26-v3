@@ -23,11 +23,12 @@ class LeaseServiceTest {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
 
-        new LeaseService(jdbcTemplate).hasActiveLease(UUID.randomUUID());
+        new LeaseService(jdbcTemplate).hasActiveLease(UUID.randomUUID(), "ANDROID");
 
         ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).queryForObject(anyString(), eq(Integer.class), arguments.capture());
-        assertThat(arguments.getValue()[1]).isInstanceOf(Timestamp.class);
+        assertThat(arguments.getValue()[1]).isEqualTo("ANDROID");
+        assertThat(arguments.getValue()[2]).isInstanceOf(Timestamp.class);
     }
 
     @Test
@@ -35,11 +36,12 @@ class LeaseServiceTest {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(0);
 
-        new LeaseService(jdbcTemplate).renewActiveLease(UUID.randomUUID());
+        new LeaseService(jdbcTemplate).renewActiveLease(UUID.randomUUID(), "WEB");
 
         ArgumentCaptor<Object[]> arguments = ArgumentCaptor.forClass(Object[].class);
         verify(jdbcTemplate).update(anyString(), arguments.capture());
         assertThat(arguments.getValue()[0]).isInstanceOf(Timestamp.class);
-        assertThat(arguments.getValue()[2]).isInstanceOf(Timestamp.class);
+        assertThat(arguments.getValue()[2]).isEqualTo("WEB");
+        assertThat(arguments.getValue()[3]).isInstanceOf(Timestamp.class);
     }
 }
