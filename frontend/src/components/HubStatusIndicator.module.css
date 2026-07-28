@@ -80,3 +80,9 @@
   text-align: right;
   word-break: break-all;
 }
+
+.platformBlock {
+  padding-top: var(--ops-space-2);
+  margin-top: var(--ops-space-2);
+  border-top: 1px solid var(--ops-color-gray-200);
+}

@@ -213,17 +213,22 @@ export interface ExecutionStatus {
   results: ExecutionTestResult[];
 }
 
-/** One row from GET /api/v1/hubs, ordered most-recently-active first. */
-export interface HubSummary {
-  id: Uuid;
-  name: string;
+/** One platform's connectivity/readiness state within a Hub. */
+export interface HubPlatformStatus {
+  platform: Platform;
   connectionStatus: "ONLINE" | "OFFLINE";
   transport: "WEBSOCKET" | "HTTPS_POLLING";
-  platform: Platform;
   deviceReady: boolean;
   runnerReady: boolean;
   lastHeartbeatAt: string | null;
+}
+
+/** One row from GET /api/v1/hubs, ordered most-recently-created first. */
+export interface HubSummary {
+  id: Uuid;
+  name: string;
   createdAt: string;
+  platforms: HubPlatformStatus[];
 }
 
 // --- Hub envelope (browser-facing realtime feed; see useExecutionChannel) ---
