@@ -81,6 +81,34 @@ Full details, including how each is validated, are in
 `docs/operations/local-hub-runbook.md` and
 `docs/deployment/rocky-linux-9.md`.
 
+### Getting `OPSHUB_HUB_ID` and `OPSHUB_HUB_TOKEN` for a given backend deployment
+
+A Hub gets a 401 from the backend when either of these doesn't match what
+that specific deployment expects:
+
+- **`OPSHUB_HUB_TOKEN`** is a shared secret set once on the backend side, in
+  `deploy/env/backend.env` (git-ignored, `chmod 600`, never committed). On
+  the machine running that backend:
+  ```bash
+  sudo cat deploy/env/backend.env | grep OPSHUB_HUB_TOKEN
+  ```
+  Copy that exact value into the Local Hub's own `local-hub/.env`. There is
+  only one token per backend deployment — every Hub talking to it uses the
+  same value.
+- **`OPSHUB_HUB_ID`** is *not* backend-issued — a Hub is auto-registered in
+  the `hubs` table on its first successful contact (see
+  `HubConnectionService`), so any well-formed UUID works the first time. If
+  you're reconnecting a Hub that's connected before (rather than registering
+  a new one), reuse its existing id instead of generating a new one:
+  ```bash
+  sudo docker exec deploy-postgres-1 psql -U opshub -d opshub \
+    -c "SELECT id, name, connection_status, platform, created_at FROM hubs;"
+  ```
+
+A 401 always means the **token** is wrong or missing (`X-Hub-Token` header
+on HTTPS polling / WebSocket connect) — a wrong-but-valid-UUID `hub_id`
+would auto-register a *new* Hub row instead of failing outright.
+
 ## Hub/device preflight and starting Appium
 
 Before executing any job, the Local Hub checks `node`/`adb` are installed,
