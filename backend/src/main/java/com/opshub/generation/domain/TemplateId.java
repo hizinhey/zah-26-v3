@@ -1,6 +1,6 @@
 package com.opshub.generation.domain;
 
-public enum TemplateId {
+public enum TemplateId implements TemplateDescriptor {
     OA_DELIVERY("android-oa-delivery-v1", 1, "578a8074cc9c58c27565e70dc798fa815d940632cdee8140b58d2b18a8919132"),
     THUMBNAIL("android-thumbnail-v1", 1, "84d686d049ccd8def4d3bcb986e51ca6f66ca89ba0cc48fefe7bbf8f515ab079"),
     CONTENT("android-content-v1", 1, "e2532e5f248e804748b05a3c2995ea70e80465262b57d793936ec1861a6f53a5"),
@@ -17,15 +17,23 @@ public enum TemplateId {
         this.sha256 = sha256;
     }
 
+    @Override
     public String id() {
         return id;
     }
 
+    @Override
     public int version() {
         return version;
     }
 
+    @Override
     public String sha256() {
         return sha256;
+    }
+
+    @Override
+    public String platform() {
+        return "ANDROID";
     }
 }
