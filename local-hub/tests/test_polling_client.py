@@ -26,7 +26,7 @@ def make_config() -> HubConfig:
 
 def transport_with_handler(handler) -> PollingTransport:
     client = httpx.Client(transport=httpx.MockTransport(handler))
-    return PollingTransport(make_config(), http_client=client)
+    return PollingTransport(make_config(), "ANDROID", http_client=client)
 
 
 def test_send_raises_permanent_error_on_409_out_of_order():
@@ -50,11 +50,16 @@ def test_send_raises_transient_error_on_500():
     assert not isinstance(exc_info.value, PermanentTransportError)
 
 
-def test_send_success_does_not_raise():
+def test_heartbeat_sends_the_platform_this_transport_was_built_for():
+    captured = {}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.headers["X-Hub-Token"] == "secret-hub-token"
-        return httpx.Response(200, json={})
+        captured["platform_header"] = request.headers.get("x-hub-platform")
+        return httpx.Response(200)
 
-    transport = transport_with_handler(handler)
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    transport = PollingTransport(make_config(), "WEB", http_client=client)
 
-    transport.send({"messageId": "1", "type": "TEST_RESULT"})
+    transport.heartbeat()
+
+    assert captured["platform_header"] == "WEB"

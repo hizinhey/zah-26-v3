@@ -16,8 +16,9 @@ from opshub_hub.transport import TransportError
 
 
 class WebSocketTransport:
-    def __init__(self, config: HubConfig, connect_timeout: float = 10.0):
+    def __init__(self, config: HubConfig, platform: str, connect_timeout: float = 10.0):
         self._config = config
+        self._platform = platform
         self._connect_timeout = connect_timeout
         self._connection: ClientConnection | None = None
 
@@ -25,7 +26,7 @@ class WebSocketTransport:
         try:
             self._connection = connect(
                 self._config.websocket_url,
-                additional_headers={"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._config.platform},
+                additional_headers={"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._platform},
                 open_timeout=self._connect_timeout,
             )
         except Exception as exc:  # noqa: BLE001 - any connect failure is a transport failure

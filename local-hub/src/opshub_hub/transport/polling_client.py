@@ -20,8 +20,9 @@ WAIT_SECONDS = 25
 
 
 class PollingTransport:
-    def __init__(self, config: HubConfig, http_client: httpx.Client | None = None):
+    def __init__(self, config: HubConfig, platform: str, http_client: httpx.Client | None = None):
         self._config = config
+        self._platform = platform
         self._client = http_client or httpx.Client(timeout=WAIT_SECONDS + 10)
 
     def connect(self) -> None:
@@ -86,7 +87,7 @@ class PollingTransport:
         self._client.close()
 
     def _headers(self) -> dict:
-        return {"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._config.platform}
+        return {"X-Hub-Token": self._config.hub_token, "X-Hub-Platform": self._platform}
 
     def _heartbeat_envelope(self) -> dict:
         return {
