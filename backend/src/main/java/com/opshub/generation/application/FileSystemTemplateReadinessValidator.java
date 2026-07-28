@@ -2,7 +2,7 @@ package com.opshub.generation.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.opshub.generation.domain.TemplateId;
+import com.opshub.generation.domain.TemplateDescriptor;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -34,12 +34,12 @@ public class FileSystemTemplateReadinessValidator implements TemplateReadinessVa
     }
 
     @Override
-    public Readiness validate(TemplateId template, TestPlanService.TemplateParameters parameters) {
+    public Readiness validate(TemplateDescriptor template, TestPlanService.TemplateParameters parameters) {
         try {
             Map<String, String> values = parameters.asMap();
             validateParameters(values);
-            Path root = Path.of(properties.getTemplateRoot()).toAbsolutePath().normalize();
-            JsonNode entry = manifestEntry(root, template);
+            Path root = Path.of(rootFor(template.platform())).toAbsolutePath().normalize();
+            JsonNode entry = manifestEntry(root, template, catalogVersion(template.platform()));
             Path templateFile = templateFile(root, entry);
             String templateSource = Files.readString(templateFile, StandardCharsets.UTF_8);
             if (!sha256(templateSource.getBytes(StandardCharsets.UTF_8)).equals(template.sha256())) {
@@ -52,17 +52,21 @@ public class FileSystemTemplateReadinessValidator implements TemplateReadinessVa
     }
 
     @Override
-    public String catalogVersion() {
-        return properties.getCatalogVersion();
+    public String catalogVersion(String platform) {
+        return "WEB".equals(platform) ? properties.getWebCatalogVersion() : properties.getCatalogVersion();
     }
 
-    private JsonNode manifestEntry(Path root, TemplateId template) throws IOException {
+    private String rootFor(String platform) {
+        return "WEB".equals(platform) ? properties.getWebTemplateRoot() : properties.getTemplateRoot();
+    }
+
+    private JsonNode manifestEntry(Path root, TemplateDescriptor template, String expectedCatalogVersion) throws IOException {
         Path manifest = root.resolve("manifest.json");
         if (!Files.isRegularFile(manifest)) {
             throw new IllegalStateException("Template manifest is missing");
         }
         JsonNode catalog = objectMapper.readTree(Files.readString(manifest, StandardCharsets.UTF_8));
-        if (!properties.getCatalogVersion().equals(catalog.path("catalogVersion").asText())) {
+        if (!expectedCatalogVersion.equals(catalog.path("catalogVersion").asText())) {
             throw new IllegalStateException("Template manifest catalog version does not match the configured catalog version");
         }
         JsonNode entries = catalog.path("templates");

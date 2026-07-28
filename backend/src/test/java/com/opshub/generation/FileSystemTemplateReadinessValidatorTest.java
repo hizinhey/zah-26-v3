@@ -38,4 +38,34 @@ class FileSystemTemplateReadinessValidatorTest {
         assertThat(readiness.ready()).isFalse();
         assertThat(readiness.reason()).contains("catalog version");
     }
+
+    @Test
+    void keepsWebTemplatesNotReadyWhenTheWebManifestCatalogVersionIsWrong() throws Exception {
+        Files.writeString(tempDirectory.resolve("manifest.json"), """
+                {"catalogVersion":"web-v2","templates":[]}
+                """);
+        TemplateReadinessProperties properties = new TemplateReadinessProperties();
+        properties.setWebTemplateRoot(tempDirectory.toString());
+        FileSystemTemplateReadinessValidator validator = new FileSystemTemplateReadinessValidator(properties, new ObjectMapper());
+
+        TemplateReadinessValidator.Readiness readiness = validator.validate(
+                com.opshub.generation.domain.WebTemplateId.OA_DELIVERY,
+                new TestPlanService.TemplateParameters(
+                        "Account", "https://example.test/thumb.png", "Header", "Body", "Open",
+                        "https://example.test/path", "example.test"
+                )
+        );
+
+        assertThat(readiness.ready()).isFalse();
+        assertThat(readiness.reason()).contains("catalog version");
+    }
+
+    @Test
+    void catalogVersionIsPlatformSpecific() {
+        TemplateReadinessProperties properties = new TemplateReadinessProperties();
+        FileSystemTemplateReadinessValidator validator = new FileSystemTemplateReadinessValidator(properties, new ObjectMapper());
+
+        assertThat(validator.catalogVersion("ANDROID")).isEqualTo(TemplateReadinessProperties.DEFAULT_CATALOG_VERSION);
+        assertThat(validator.catalogVersion("WEB")).isEqualTo(TemplateReadinessProperties.DEFAULT_WEB_CATALOG_VERSION);
+    }
 }
