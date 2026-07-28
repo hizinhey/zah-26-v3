@@ -3,6 +3,8 @@ package com.opshub.hub.application;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -13,10 +15,21 @@ import java.util.UUID;
  */
 @Service
 public class HubQueryService {
-    private final JdbcTemplate jdbcTemplate;
+    /**
+     * A killed/crashed backend process never runs HubWebSocketHandler#afterConnectionClosed - the
+     * only thing that calls HubConnectionService#markOffline - so hubs.connection_status can be
+     * stuck at ONLINE indefinitely for a Hub that's actually gone. 3x the Local Hub's 20s heartbeat
+     * interval tolerates one missed beat (matching the "three consecutive failures" threshold the
+     * Hub itself uses before failing over transports) without flapping the indicator on jitter.
+     */
+    static final Duration STALE_AFTER = Duration.ofSeconds(60);
 
-    public HubQueryService(JdbcTemplate jdbcTemplate) {
+    private final JdbcTemplate jdbcTemplate;
+    private final Clock clock;
+
+    public HubQueryService(JdbcTemplate jdbcTemplate, Clock clock) {
         this.jdbcTemplate = jdbcTemplate;
+        this.clock = clock;
     }
 
     public List<HubSummary> listHubs() {
@@ -26,16 +39,28 @@ public class HubQueryService {
                 FROM hubs
                 ORDER BY last_heartbeat_at DESC NULLS LAST, created_at DESC
                 """,
-                (rs, rowNum) -> new HubSummary(
-                        rs.getObject("id", UUID.class),
-                        rs.getString("name"),
-                        rs.getString("connection_status"),
-                        rs.getString("transport"),
-                        rs.getString("platform"),
-                        rs.getBoolean("device_ready"),
-                        rs.getBoolean("runner_ready"),
-                        rs.getTimestamp("last_heartbeat_at") == null ? null : rs.getTimestamp("last_heartbeat_at").toInstant(),
-                        rs.getTimestamp("created_at").toInstant()));
+                (rs, rowNum) -> {
+                    Instant lastHeartbeatAt = rs.getTimestamp("last_heartbeat_at") == null
+                            ? null : rs.getTimestamp("last_heartbeat_at").toInstant();
+                    return new HubSummary(
+                            rs.getObject("id", UUID.class),
+                            rs.getString("name"),
+                            effectiveConnectionStatus(rs.getString("connection_status"), lastHeartbeatAt),
+                            rs.getString("transport"),
+                            rs.getString("platform"),
+                            rs.getBoolean("device_ready"),
+                            rs.getBoolean("runner_ready"),
+                            lastHeartbeatAt,
+                            rs.getTimestamp("created_at").toInstant());
+                });
+    }
+
+    private String effectiveConnectionStatus(String rawConnectionStatus, Instant lastHeartbeatAt) {
+        if (!"ONLINE".equals(rawConnectionStatus)) {
+            return rawConnectionStatus;
+        }
+        boolean stale = lastHeartbeatAt == null || Duration.between(lastHeartbeatAt, clock.instant()).compareTo(STALE_AFTER) > 0;
+        return stale ? "OFFLINE" : "ONLINE";
     }
 
     public record HubSummary(

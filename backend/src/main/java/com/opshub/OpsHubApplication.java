@@ -8,7 +8,10 @@ import com.opshub.execution.application.WebWorkerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.time.Clock;
 
 @SpringBootApplication
 @EnableConfigurationProperties({ThumbnailValidationProperties.class, TemplateReadinessProperties.class,
@@ -17,5 +20,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class OpsHubApplication {
     public static void main(String[] args) {
         SpringApplication.run(OpsHubApplication.class, args);
+    }
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
     }
 }
