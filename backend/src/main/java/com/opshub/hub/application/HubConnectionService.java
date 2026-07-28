@@ -20,6 +20,8 @@ public class HubConnectionService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    private static final String DEFAULT_PLATFORM = "ANDROID";
+
     public void markOnline(UUID hubId, String transport, String platform) {
         upsert(hubId, transport, "ONLINE", null, null, platform);
     }
@@ -33,19 +35,25 @@ public class HubConnectionService {
     }
 
     private void upsert(UUID hubId, String transport, String status, Boolean deviceReady, Boolean runnerReady, String platform) {
+        // The X-Hub-Platform header (or WS handshake attribute) is caller-supplied and not
+        // otherwise validated before reaching here - hubs.platform has a CHECK constraint
+        // (ANDROID/WEB only), so anything else would 500 out of this call on every single
+        // poll/heartbeat for that Hub. Fall back to the documented default for pre-WEB Hubs
+        // rather than let a stray/malformed header value take the Hub offline permanently.
+        String normalizedPlatform = "WEB".equals(platform) ? "WEB" : DEFAULT_PLATFORM;
         Timestamp heartbeatAt = Timestamp.from(Instant.now());
         int updated = jdbcTemplate.update("""
                         UPDATE hubs
                         SET connection_status = ?, transport = ?, last_heartbeat_at = ?, platform = ?,
                             device_ready = COALESCE(?, device_ready), runner_ready = COALESCE(?, runner_ready)
                         WHERE id = ?
-                        """, status, transport, heartbeatAt, platform, deviceReady, runnerReady, hubId);
+                        """, status, transport, heartbeatAt, normalizedPlatform, deviceReady, runnerReady, hubId);
         if (updated == 0) {
             jdbcTemplate.update("""
                             INSERT INTO hubs (id, name, connection_status, transport, last_heartbeat_at, device_ready, runner_ready, platform)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                             """, hubId, hubId.toString(), status, transport, heartbeatAt,
-                    deviceReady != null && deviceReady, runnerReady != null && runnerReady, platform);
+                    deviceReady != null && deviceReady, runnerReady != null && runnerReady, normalizedPlatform);
         }
     }
 }

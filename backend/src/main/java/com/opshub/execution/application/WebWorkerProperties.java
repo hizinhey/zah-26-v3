@@ -11,6 +11,8 @@ public class WebWorkerProperties {
     private String backendUrl = "";
     private String templateRoot = "";
     private String dataRoot = "";
+    private String wdioProjectRoot = "";
+    private String nodeExecutable = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -66,5 +68,21 @@ public class WebWorkerProperties {
 
     public void setDataRoot(String dataRoot) {
         this.dataRoot = dataRoot;
+    }
+
+    public String getWdioProjectRoot() {
+        return wdioProjectRoot;
+    }
+
+    public void setWdioProjectRoot(String wdioProjectRoot) {
+        this.wdioProjectRoot = wdioProjectRoot;
+    }
+
+    public String getNodeExecutable() {
+        return nodeExecutable;
+    }
+
+    public void setNodeExecutable(String nodeExecutable) {
+        this.nodeExecutable = nodeExecutable;
     }
 }

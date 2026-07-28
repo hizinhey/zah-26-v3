@@ -99,31 +99,36 @@ disabled by default) rather than it running as an always-on service.
 
 One-time setup on the host that will run it:
 
-1. Provision the Node project that `OPSHUB_WDIO_PROJECT_DIR` (section 2)
-   points at so it contains `wdio.web.conf.ts` at its root, alongside the
-   existing `wdio.conf.ts` used for Android (same `node_modules`/
-   `package.json`, WebdriverIO v9 manages its own matching chromedriver —
-   no separate driver install needed). `wdio.web.conf.ts`
-   needs a plain `browserName: 'chrome'` capability with
-   `'goog:chromeOptions': { args: ['--user-data-dir=<profile-dir>'] } }`,
+1. Provision a Node project on the backend host containing `wdio.web.conf.ts`
+   at its root (same `node_modules`/`package.json` an ANDROID Local Hub would
+   use, alongside `wdio.conf.ts` if the same host also runs Android - WebdriverIO
+   v9 manages its own matching chromedriver, no separate driver install
+   needed). `wdio.web.conf.ts` needs a plain `browserName: 'chrome'`
+   capability with `'goog:chromeOptions': { args: ['--user-data-dir=<profile-dir>'] } }`,
    `maxInstances: 1`, and an `afterTest` hook that writes
    `await browser.saveScreenshot('./evidence/last-screenshot.png')` after
    every test (creating the `evidence/` directory first if it doesn't
    exist) — this is how `WebScreenshotCapturer`
    (`local-hub/src/opshub_hub/browser_control.py`) picks up each test's
-   evidence.
+   evidence. This is the same project `opshub.web-worker.wdio-project-root`
+   (step 3) will point at - unlike Android, the backend-launched Web worker
+   has no `local-hub/.env` of its own to read `OPSHUB_WDIO_PROJECT_DIR` from.
 2. Open that Chrome profile once manually and scan the Zalo QR login code
    with a dedicated test account's phone. The profile directory now stays
    signed in across runs; point `opshub.web-worker.data-root`'s
    `chrome-profile` subdirectory (or whichever path `wdio.web.conf.ts`'s
    `--user-data-dir` uses) at it.
 3. Set `opshub.web-worker.enabled=true` and the rest of the
-   `opshub.web-worker.*` properties (`python-executable`,
+   `opshub.web-worker.*` properties on the backend: `python-executable`,
    `working-directory` — the Local Hub checkout with its Python venv
    already installed — `hub-id` — **must be a real UUID string** the
    backend's `hubs` table can key on, the default `web-worker` is a
    placeholder that will fail to connect — `backend-url`, `template-root`
-   pointing at `local-hub/templates/web`, `data-root`) on the backend.
+   pointing at `local-hub/templates/web`, `data-root`, `wdio-project-root`
+   (step 1's project) and `node-executable` (a Node 20+ binary) — these last
+   two are passed to the spawned worker as `OPSHUB_WDIO_PROJECT_DIR`/
+   `OPSHUB_NODE_EXECUTABLE`, required unconditionally by every Local Hub
+   process regardless of platform (section 2).
 
 Unlike Android, this Hub isn't started manually — the backend launches it
 (`WebWorkerLauncher`) the first time an operator starts an execution

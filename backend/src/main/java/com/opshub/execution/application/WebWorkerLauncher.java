@@ -56,7 +56,13 @@ public class WebWorkerLauncher {
                     "OPSHUB_HUB_TOKEN", hubProperties.getSharedToken(),
                     "OPSHUB_TEMPLATE_DIR", properties.getTemplateRoot(),
                     "OPSHUB_WORK_DIR", properties.getDataRoot(),
-                    "OPSHUB_PLATFORM", "WEB"
+                    "OPSHUB_PLATFORM", "WEB",
+                    // Required unconditionally by opshub_hub.config.load_config for both
+                    // platforms (see local-hub/src/opshub_hub/config.py) - without these the
+                    // spawned worker process exits immediately with a ValueError before it ever
+                    // reaches preflight, let alone executes a job.
+                    "OPSHUB_WDIO_PROJECT_DIR", properties.getWdioProjectRoot(),
+                    "OPSHUB_NODE_EXECUTABLE", properties.getNodeExecutable()
             );
             try {
                 runningProcess = processStarter.start(command, Path.of(properties.getWorkingDirectory()), env);

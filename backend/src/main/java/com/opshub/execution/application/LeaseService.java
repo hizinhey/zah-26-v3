@@ -95,12 +95,11 @@ public class LeaseService {
         return jdbcTemplate.queryForList("""
                         SELECT execution.id
                         FROM executions execution
-                        JOIN test_plans plan ON plan.id = execution.plan_id
                         WHERE execution.status IN ('QUEUED', 'RUNNING')
                           AND execution.finished_at IS NULL
                           AND EXISTS (
                               SELECT 1 FROM official_accounts oa
-                              WHERE oa.operation_id = plan.operation_id AND oa.platform = ?
+                              WHERE oa.operation_id = execution.operation_id AND oa.platform = ?
                           )
                           AND NOT EXISTS (
                               SELECT 1 FROM job_leases lease

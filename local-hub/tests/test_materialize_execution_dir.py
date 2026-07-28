@@ -40,9 +40,9 @@ def _make_test_case(order: int) -> TestCase:
     )
 
 
-def _make_wdio_project(root: Path) -> Path:
+def _make_wdio_project(root: Path, config_filename: str = "wdio.conf.ts") -> Path:
     root.mkdir()
-    (root / "wdio.conf.ts").write_text("export const config = { marker: 'pinned-project' };")
+    (root / config_filename).write_text("export const config = { marker: 'pinned-project' };")
     (root / "tsconfig.json").write_text('{"marker": "pinned-tsconfig"}')
     (root / "node_modules").mkdir()
     (root / "node_modules" / "marker.txt").write_text("pinned-node-modules")
@@ -75,6 +75,28 @@ def test_with_wdio_project_root_copies_config_and_symlinks_node_modules(tmp_path
     node_modules_link = execution_dir / "node_modules"
     assert node_modules_link.is_symlink()
     assert (node_modules_link / "marker.txt").read_text() == "pinned-node-modules"
+
+
+def test_web_platform_copies_wdio_web_conf_instead_of_wdio_conf(tmp_path):
+    """Critical-1 regression: the Web execution path previously never got a config file
+    materialized at all (only ANDROID's "wdio.conf.ts" was ever copied, and build_web_runner
+    never passed wdio_project_root in the first place). config_filename must select which real
+    project file lands in the execution directory."""
+    catalog = TemplateCatalog(TEMPLATE_ROOT)
+    execution_dir = tmp_path / "execution"
+    wdio_project_root = _make_wdio_project(tmp_path / "wdio-project", config_filename="wdio.web.conf.ts")
+
+    materialize_execution_dir(
+        catalog,
+        execution_dir,
+        [_make_test_case(1)],
+        wdio_project_root=wdio_project_root,
+        config_filename="wdio.web.conf.ts",
+    )
+
+    assert (execution_dir / "wdio.web.conf.ts").read_text() == "export const config = { marker: 'pinned-project' };"
+    assert not (execution_dir / "wdio.conf.ts").exists()
+    assert (execution_dir / "tsconfig.json").read_text() == '{"marker": "pinned-tsconfig"}'
 
 
 def test_wdio_project_files_are_not_recopied_on_a_second_materialize_call(tmp_path):

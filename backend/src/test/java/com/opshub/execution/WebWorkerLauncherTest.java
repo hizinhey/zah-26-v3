@@ -61,7 +61,13 @@ class WebWorkerLauncherTest {
         assertThat(envs.get(0))
                 .containsEntry("OPSHUB_HUB_ID", "web-worker")
                 .containsEntry("OPSHUB_PLATFORM", "WEB")
-                .containsEntry("OPSHUB_BACKEND_URL", "https://backend.example.test");
+                .containsEntry("OPSHUB_BACKEND_URL", "https://backend.example.test")
+                // Regression coverage: opshub_hub.config.load_config requires these unconditionally
+                // for both platforms (see local-hub/src/opshub_hub/config.py) - without them the
+                // spawned worker process exits immediately with a ValueError, before it ever reaches
+                // preflight or executes a job.
+                .containsEntry("OPSHUB_WDIO_PROJECT_DIR", "/opt/opshub/local-hub/mobile_script")
+                .containsEntry("OPSHUB_NODE_EXECUTABLE", "/usr/bin/node");
     }
 
     @Test
@@ -88,6 +94,8 @@ class WebWorkerLauncherTest {
         properties.setBackendUrl("https://backend.example.test");
         properties.setTemplateRoot("/opt/opshub/local-hub/templates/web");
         properties.setDataRoot("/opt/opshub/data/web-worker");
+        properties.setWdioProjectRoot("/opt/opshub/local-hub/mobile_script");
+        properties.setNodeExecutable("/usr/bin/node");
         return properties;
     }
 
