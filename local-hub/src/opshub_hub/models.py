@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Annotated, Literal, Union
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 
 class StrictModel(BaseModel):
@@ -67,29 +67,43 @@ class TestCase(StrictModel):
     parameters: TemplateParametersV1
 
 
-# Fixed order/templateId per position, mirroring $defs.OrderedTestCases'
+# Fixed order/templateId per position per platform, mirroring $defs.OrderedTestCases'
 # prefixItems in contracts/schemas/hub-envelope-v1.json.
-ORDERED_TEST_CASE_TEMPLATE_IDS: tuple[str, ...] = (
-    "android-oa-delivery-v1",
-    "android-thumbnail-v1",
-    "android-content-v1",
-    "android-button-text-v1",
-    "android-redirect-v1",
-)
+ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM: dict[str, tuple[str, ...]] = {
+    "ANDROID": (
+        "android-oa-delivery-v1",
+        "android-thumbnail-v1",
+        "android-content-v1",
+        "android-button-text-v1",
+        "android-redirect-v1",
+    ),
+    "WEB": (
+        "web-oa-delivery-v1",
+        "web-thumbnail-v1",
+        "web-content-v1",
+        "web-button-text-v1",
+        "web-redirect-v1",
+    ),
+}
+
+# Retained for any existing import of the old single-platform name; equivalent to
+# ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM["ANDROID"].
+ORDERED_TEST_CASE_TEMPLATE_IDS: tuple[str, ...] = ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM["ANDROID"]
 
 
 class JobOfferedPayload(StrictModel):
     executionId: UUID
     idempotencyKey: str = Field(min_length=1)
     revision: int = Field(ge=1)
-    platform: Literal["ANDROID"]
+    platform: Literal["ANDROID", "WEB"]
     testCases: list[TestCase]
     leaseToken: UUID
 
-    @field_validator("testCases")
-    @classmethod
-    def validate_ordered_test_cases(cls, value: list[TestCase]) -> list[TestCase]:
-        group_size = len(ORDERED_TEST_CASE_TEMPLATE_IDS)
+    @model_validator(mode="after")
+    def validate_ordered_test_cases(self) -> "JobOfferedPayload":
+        ordered_template_ids = ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM[self.platform]
+        group_size = len(ordered_template_ids)
+        value = self.testCases
         if len(value) == 0 or len(value) % group_size != 0:
             raise ValueError(
                 f"testCases must contain a positive multiple of {group_size} items "
@@ -107,7 +121,7 @@ class JobOfferedPayload(StrictModel):
                     f"got {group_oa_order}"
                 )
             for offset, (test_case, expected_template_id) in enumerate(
-                zip(group, ORDERED_TEST_CASE_TEMPLATE_IDS)
+                zip(group, ordered_template_ids)
             ):
                 expected_order = offset + 1
                 if test_case.oaOrder != group_oa_order:
@@ -125,7 +139,7 @@ class JobOfferedPayload(StrictModel):
                         f"testCases group {group_index} position {offset}: templateId must be "
                         f"'{expected_template_id}', got '{test_case.templateId}'"
                     )
-        return value
+        return self
 
 
 class JobProgressPayload(StrictModel):

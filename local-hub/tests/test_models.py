@@ -14,7 +14,11 @@ from copy import deepcopy
 import pytest
 from pydantic import ValidationError
 
-from opshub_hub.models import ORDERED_TEST_CASE_TEMPLATE_IDS, parse_envelope
+from opshub_hub.models import (
+    ORDERED_TEST_CASE_TEMPLATE_IDS,
+    ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM,
+    parse_envelope,
+)
 
 
 def _template_parameters() -> dict:
@@ -122,5 +126,26 @@ def test_job_offered_with_wrong_oa_order_grouping_is_rejected():
     # Second group should be oaOrder=2; make it 3 to break contiguous grouping.
     for case in data["payload"]["testCases"][5:]:
         case["oaOrder"] = 3
+    with pytest.raises(ValidationError):
+        parse_envelope(data)
+
+
+def test_job_offered_payload_accepts_web_platform_with_web_template_ids():
+    data = deepcopy(_valid_job_offered_envelope())
+    data["payload"]["platform"] = "WEB"
+    data["payload"]["testCases"] = [
+        _test_case(1, index + 1, template_id)
+        for index, template_id in enumerate(ORDERED_TEST_CASE_TEMPLATE_IDS_BY_PLATFORM["WEB"])
+    ]
+    envelope = parse_envelope(data)
+    assert envelope.payload.platform == "WEB"
+    assert envelope.payload.testCases[0].templateId == "web-oa-delivery-v1"
+    assert len(envelope.payload.testCases) == 5
+
+
+def test_job_offered_payload_rejects_android_template_ids_for_a_web_platform_job():
+    data = deepcopy(_valid_job_offered_envelope())
+    data["payload"]["platform"] = "WEB"
+    # testCases still use android-*-v1 ids, which must not validate against a WEB job.
     with pytest.raises(ValidationError):
         parse_envelope(data)
