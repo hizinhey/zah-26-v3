@@ -37,12 +37,16 @@ class _FakeTransport:
 
 
 def test_build_runner_wires_a_real_screenshot_capturer_and_appium_session_resetter(tmp_path):
+    wdio_project_root = tmp_path / "wdio-project"
+    wdio_project_root.mkdir()
     config = HubConfig(
         backend_url="https://backend.example.test",
         hub_id="hub-1",
         hub_token="token",
         template_root=TEMPLATE_ROOT,
         data_root=tmp_path,
+        wdio_project_root=wdio_project_root,
+        node_executable=Path("/usr/bin/node"),
     )
     transport = FailoverTransport(ws_transport=_FakeTransport(), polling_transport=_FakeTransport())
     outbox = Outbox(tmp_path / "outbox.sqlite3")
@@ -54,6 +58,18 @@ def test_build_runner_wires_a_real_screenshot_capturer_and_appium_session_resett
     )
     assert runner._reset_appium_session is not None, (
         "build_runner must pass a real reset_appium_session, or infra retries never reset the session"
+    )
+    assert runner._wdio_project_root == wdio_project_root, (
+        "build_runner must pass config.wdio_project_root through so specs are materialized as a "
+        "real, runnable WebdriverIO project rather than a bare directory with no wdio.conf.ts"
+    )
+    command = runner._command_builder(Path("/tmp/exec/tests/example.spec.ts"))
+    assert command[0] == "/usr/bin/node", (
+        "build_runner must use the pinned node_executable, not npx/PATH's node - "
+        f"got command: {command}"
+    )
+    assert str(wdio_project_root / "node_modules" / ".bin" / "wdio") in command, (
+        f"build_runner must invoke the pinned project's own wdio CLI directly - got command: {command}"
     )
 
 

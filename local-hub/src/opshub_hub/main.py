@@ -16,7 +16,7 @@ from opshub_hub.journal import ExecutionJournal
 from opshub_hub.models import JobOfferedPayload
 from opshub_hub.outbox import Outbox
 from opshub_hub.preflight import run_preflight
-from opshub_hub.runner import Runner
+from opshub_hub.runner import Runner, build_wdio_command_builder
 from opshub_hub.templates import TemplateCatalog
 from opshub_hub.transport.failover import FailoverTransport
 from opshub_hub.transport.polling_client import PollingTransport
@@ -37,6 +37,17 @@ def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox
     # single infrastructure retry never reset the Appium session. See appium_control.py's
     # module docstring for why neither of these needs the Hub to hold a live WebDriver session
     # itself (each generated WebdriverIO spec manages its own session in its own subprocess).
+    # Node-version fix: run the pinned WebdriverIO CLI (config.wdio_project_root's own
+    # node_modules/.bin/wdio) via the pinned config.node_executable, instead of the previous
+    # `npx wdio run` default - which cold-bootstrapped a fresh, config-less WebdriverIO project
+    # in the execution directory on every single attempt (visible in its own logs as "Creating
+    # WebdriverIO project..."), using whatever `node` happened to be first on PATH. On a host
+    # where that's an older Node (this one's system `node` is 18.15.0), WebdriverIO's own
+    # dependencies fail to even load (`node:events` doesn't export `addAbortListener` before
+    # Node 20), so every attempt errored out immediately, before any real assertion ever ran -
+    # and that error was misclassified as a genuine app ASSERTION_FAILURE rather than the
+    # infrastructure/environment problem it actually was.
+    command_builder = build_wdio_command_builder(config.node_executable, config.wdio_project_root)
     return Runner(
         catalog=catalog,
         execution_root=execution_root,
@@ -46,6 +57,8 @@ def build_runner(config: HubConfig, transport: FailoverTransport, outbox: Outbox
         evidence_uploader=evidence_uploader,
         screenshot_capturer=AdbScreenshotCapturer(),
         reset_appium_session=AppiumSessionResetter(),
+        command_builder=command_builder,
+        wdio_project_root=config.wdio_project_root,
     )
 
 
@@ -111,7 +124,15 @@ def _heartbeat_while_running(transport: FailoverTransport, interval: float = HEA
 def run_forever(config: HubConfig | None = None) -> None:
     config = config or load_config()
 
-    preflight = run_preflight(template_root=config.template_root, data_root=config.data_root)
+    preflight = run_preflight(
+        template_root=config.template_root,
+        data_root=config.data_root,
+        # Check the pinned Node executable itself (not whatever "node" resolves to on PATH -
+        # see build_runner's command_builder comment for why that distinction matters) and that
+        # the pinned WebdriverIO project actually has its CLI installed.
+        required_executables=(str(config.node_executable), "adb"),
+        wdio_project_root=config.wdio_project_root,
+    )
     if not preflight.ok:
         for failure in preflight.failures():
             logger.error("Preflight check failed: %s (%s)", failure.name, failure.detail)

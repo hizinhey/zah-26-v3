@@ -40,6 +40,8 @@ values:
 | `OPSHUB_HUB_TOKEN` | Shared bearer token presented on every Hub-facing request (`X-Hub-Token` header / WebSocket `token` query param). Must match `OPSHUB_HUB_TOKEN` in `deploy/env/backend.env` on the backend side |
 | `OPSHUB_TEMPLATE_DIR` | Path to the WebdriverIO template catalog (`local-hub/templates/android` in this repo) |
 | `OPSHUB_WORK_DIR` | Writable data root for the Outbox database, rendered specs, evidence staging, and journal |
+| `OPSHUB_WDIO_PROJECT_DIR` | A real, installed WebdriverIO project (`wdio.conf.ts`, `tsconfig.json`, `node_modules`) that every execution's rendered spec is run against — e.g. this repo's `mobile_script/` directory, installed locally per runner host, never committed. Without this the runner has no config or dependencies to run a spec with |
+| `OPSHUB_NODE_EXECUTABLE` | Node.js 20+ binary used to run the pinned WebdriverIO CLI directly, bypassing whatever `node` (if any, and whatever version) happens to be first on `PATH` |
 
 Related, but not read by the Hub process itself:
 
@@ -52,7 +54,7 @@ Related, but not read by the Hub process itself:
 
 Before executing any job, the Hub runs (`opshub_hub.preflight.run_preflight`):
 
-- **Executable versions** — `node` and `adb` must be on `PATH`.
+- **Executable versions** — `OPSHUB_NODE_EXECUTABLE` and `adb` must run.
 - **ADB device state** — exactly one authorized device/emulator visible to
   `adb devices`.
 - **Appium reachability** — `GET http://127.0.0.1:4723/status` (or the
@@ -61,6 +63,8 @@ Before executing any job, the Hub runs (`opshub_hub.preflight.run_preflight`):
   must list the package on the connected device.
 - **Template manifest integrity** — the template catalog's checksums must
   match its manifest.
+- **WebdriverIO project installed** — `OPSHUB_WDIO_PROJECT_DIR` must contain
+  `wdio.conf.ts`, `tsconfig.json`, and an installed `node_modules/.bin/wdio`.
 - **Writable data directories** — `OPSHUB_WORK_DIR` and its subdirectories
   must be writable.
 

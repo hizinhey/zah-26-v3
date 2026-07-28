@@ -83,7 +83,28 @@ class ExecutionSummary:
 
 
 def default_command_builder(spec_path: Path) -> list[str]:
+    """Cold-bootstraps WebdriverIO via `npx` using whichever `node`/`npm` happen to be on
+    `PATH`. Never use this for real device execution: with no `wdio.conf.ts` in the execution
+    directory, `npx wdio run` has nothing to run and falls back to its interactive `wdio config`
+    setup wizard, and it has no guarantee `PATH`'s `node` is new enough for the pinned
+    WebdriverIO/Appium dependencies (see `build_wdio_command_builder` for the real one, wired in
+    by `main.build_runner` from `OPSHUB_NODE_EXECUTABLE`/`OPSHUB_WDIO_PROJECT_DIR`). Kept only as
+    the default for callers/tests that inject their own launcher and never actually invoke it.
+    """
     return ["npx", "wdio", "run", "wdio.conf.ts", "--spec", str(spec_path)]
+
+
+def build_wdio_command_builder(node_executable: Path, wdio_project_root: Path) -> Callable[[Path], list[str]]:
+    """Builds the real command: the pinned `node_executable` running the pinned project's own
+    `node_modules/.bin/wdio` CLI script directly (bypassing `npx` and any cold install/bootstrap)
+    against the `wdio.conf.ts` that `materialize_execution_dir` copies into every execution
+    directory, targeting exactly the one freshly rendered spec for this attempt."""
+    wdio_bin = wdio_project_root / "node_modules" / ".bin" / "wdio"
+
+    def build(spec_path: Path) -> list[str]:
+        return [str(node_executable), str(wdio_bin), "run", "wdio.conf.ts", "--spec", str(spec_path)]
+
+    return build
 
 
 _TERMINAL_PROGRESS_STATUS: dict[TestResultStatus, TestCaseStatus] = {
@@ -106,6 +127,7 @@ class Runner:
         screenshot_capturer: Callable[[Path], Path] | None = None,
         reset_appium_session: AppiumSessionResetter | None = None,
         command_builder: Callable[[Path], list[str]] = default_command_builder,
+        wdio_project_root: Path | None = None,
         spec_timeout: float = 300.0,
         clock: Callable[[], float] = time.monotonic,
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
@@ -119,13 +141,16 @@ class Runner:
         self._screenshot_capturer = screenshot_capturer
         self._reset_appium_session = reset_appium_session
         self._command_builder = command_builder
+        self._wdio_project_root = wdio_project_root
         self._spec_timeout = spec_timeout
         self._clock = clock
         self._now = now
 
     def run(self, job: JobOfferedPayload) -> ExecutionSummary:
         execution_dir = self._execution_root / str(job.executionId)
-        spec_paths = materialize_execution_dir(self._catalog, execution_dir, job.testCases)
+        spec_paths = materialize_execution_dir(
+            self._catalog, execution_dir, job.testCases, wdio_project_root=self._wdio_project_root
+        )
         logs_dir = execution_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         evidence_dir = execution_dir / "evidence"

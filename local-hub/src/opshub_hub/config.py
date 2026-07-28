@@ -20,6 +20,14 @@ class HubConfig(BaseModel):
     hub_token: str = Field(min_length=1)
     template_root: Path
     data_root: Path
+    wdio_project_root: Path
+    """A real, installed WebdriverIO project (`wdio.conf.ts`, `tsconfig.json`, `node_modules`)
+    that every execution's rendered spec is run against - see `OPSHUB_WDIO_PROJECT_DIR`.
+    Without this, the runner has no config file or dependencies to actually run a spec with."""
+    node_executable: Path
+    """Node.js binary (>=20) used to run the pinned WebdriverIO CLI directly, bypassing `npx`
+    and whatever `node` (if any, and whatever version) happens to be first on `PATH` - see
+    `OPSHUB_NODE_EXECUTABLE`."""
 
     @property
     def websocket_url(self) -> str:
@@ -53,6 +61,8 @@ _ENV_MAP = {
     "hub_token": "OPSHUB_HUB_TOKEN",
     "template_root": "OPSHUB_TEMPLATE_DIR",
     "data_root": "OPSHUB_WORK_DIR",
+    "wdio_project_root": "OPSHUB_WDIO_PROJECT_DIR",
+    "node_executable": "OPSHUB_NODE_EXECUTABLE",
 }
 
 
@@ -68,4 +78,6 @@ def load_config(env: dict | None = None) -> HubConfig:
         hub_token=source[_ENV_MAP["hub_token"]],
         template_root=Path(source[_ENV_MAP["template_root"]]),
         data_root=Path(source[_ENV_MAP["data_root"]]),
+        wdio_project_root=Path(source[_ENV_MAP["wdio_project_root"]]),
+        node_executable=Path(source[_ENV_MAP["node_executable"]]),
     )
