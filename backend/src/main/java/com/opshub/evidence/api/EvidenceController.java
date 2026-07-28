@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -87,6 +88,12 @@ class EvidenceErrorHandler {
     @ExceptionHandler(EvidenceValidationException.class)
     ResponseEntity<ErrorResponse> validationFailed(EvidenceValidationException exception) {
         return ResponseEntity.badRequest().body(new ErrorResponse("EVIDENCE_REJECTED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> uploadTooLarge() {
+        return ResponseEntity.badRequest()
+                .body(new ErrorResponse("EVIDENCE_TOO_LARGE", "Uploaded file exceeds the maximum upload size."));
     }
 
     @ExceptionHandler(EvidenceController.InvalidHubTokenException.class)

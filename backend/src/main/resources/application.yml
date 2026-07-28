@@ -1,6 +1,10 @@
 spring:
   application:
     name: opshub-backend
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 12MB
   datasource:
     url: ${OPSHUB_DATABASE_URL:jdbc:postgresql://localhost:5432/opshub}
     username: ${OPSHUB_DATABASE_USERNAME:opshub}
