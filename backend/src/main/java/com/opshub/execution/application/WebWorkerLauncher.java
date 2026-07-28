@@ -1,6 +1,7 @@
 package com.opshub.execution.application;
 
 import com.opshub.hub.application.HubProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ public class WebWorkerLauncher {
     private final ReentrantLock lock = new ReentrantLock();
     private Process runningProcess;
 
+    @Autowired
     public WebWorkerLauncher(WebWorkerProperties properties, HubProperties hubProperties) {
         this(properties, hubProperties, WebWorkerLauncher::startRealProcess);
     }

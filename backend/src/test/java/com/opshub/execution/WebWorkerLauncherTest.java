@@ -2,7 +2,9 @@ package com.opshub.execution;
 
 import com.opshub.execution.application.WebWorkerLauncher;
 import com.opshub.execution.application.WebWorkerProperties;
+import com.opshub.hub.application.HubProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -14,6 +16,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WebWorkerLauncherTest {
+    @Test
+    void springCanCreateTheLauncherWithItsProductionDependencies() {
+        new ApplicationContextRunner()
+                .withBean(WebWorkerProperties.class)
+                .withBean(HubProperties.class)
+                .withBean(WebWorkerLauncher.class)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(WebWorkerLauncher.class);
+                });
+    }
+
     @Test
     void doesNothingWhenDisabled() {
         WebWorkerProperties properties = new WebWorkerProperties();
