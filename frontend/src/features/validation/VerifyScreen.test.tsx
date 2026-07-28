@@ -112,7 +112,7 @@ describe("VerifyScreen", () => {
   it("disables Generate using the API's canGenerate flag and reason text, not a client-recomputed rule", () => {
     renderScreen(failedRun);
 
-    const generate = screen.getByRole("button", { name: "Generate" });
+    const generate = screen.getByRole("button", { name: "AI Generate" });
     expect(generate).toBeDisabled();
     expect(screen.getByRole("note")).toHaveTextContent(
       "Resolve every failed, warning, or unavailable validation finding before generating tests.",
@@ -122,7 +122,7 @@ describe("VerifyScreen", () => {
   it("enables Generate once the API reports canGenerate=true", () => {
     renderScreen(passedRun, operation({ status: "VALIDATED" }));
 
-    const generate = screen.getByRole("button", { name: "Generate" });
+    const generate = screen.getByRole("button", { name: "AI Generate" });
     expect(generate).toBeEnabled();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
@@ -148,7 +148,7 @@ describe("VerifyScreen", () => {
     await waitFor(() =>
       expect(mocks.validateOperation).toHaveBeenCalledWith("op-1", { expectedRevision: 2 }),
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "AI Generate" })).toBeEnabled());
   });
 
   it("surfaces a conflict message and refetches instead of leaving stale results on a stale re-check", async () => {
@@ -167,7 +167,7 @@ describe("VerifyScreen", () => {
     expect(await screen.findByText(/current revision 5/)).toBeInTheDocument();
     // No incorrect state left displayed: the stale failedRun rows are still
     // showing (no crash / no bogus success), and Generate stays gated.
-    expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "AI Generate" })).toBeDisabled();
     await waitFor(() => expect(mocks.getOperation).toHaveBeenCalledTimes(2));
   });
 });

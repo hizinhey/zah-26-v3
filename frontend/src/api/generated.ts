@@ -213,6 +213,19 @@ export interface ExecutionStatus {
   results: ExecutionTestResult[];
 }
 
+/** One row from GET /api/v1/hubs, ordered most-recently-active first. */
+export interface HubSummary {
+  id: Uuid;
+  name: string;
+  connectionStatus: "ONLINE" | "OFFLINE";
+  transport: "WEBSOCKET" | "HTTPS_POLLING";
+  platform: Platform;
+  deviceReady: boolean;
+  runnerReady: boolean;
+  lastHeartbeatAt: string | null;
+  createdAt: string;
+}
+
 // --- Hub envelope (browser-facing realtime feed; see useExecutionChannel) ---
 
 export interface JobOfferedPayload {

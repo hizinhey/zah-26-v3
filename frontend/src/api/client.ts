@@ -6,6 +6,7 @@ import type {
   ExecutionResponse,
   ExecutionStatus,
   GeneratePlanRequest,
+  HubSummary,
   Operation,
   ReplaceOasRequest,
   StartExecutionRequest,
@@ -118,5 +119,9 @@ export const apiClient = {
 
   listEvidence(testResultId: string): Promise<EvidenceItem[]> {
     return request<EvidenceItem[]>(`/test-results/${testResultId}/evidence`);
+  },
+
+  listHubs(): Promise<HubSummary[]> {
+    return request<HubSummary[]>("/hubs");
   },
 };

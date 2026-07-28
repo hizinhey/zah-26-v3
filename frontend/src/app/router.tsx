@@ -4,6 +4,7 @@ import { InputScreen } from "../features/operations/InputScreen";
 import { VerifyScreen } from "../features/validation/VerifyScreen";
 import { GenerateScreen } from "../features/generation/GenerateScreen";
 import { ExecuteScreen } from "../features/execution/ExecuteScreen";
+import { HubStatusIndicator } from "../components/HubStatusIndicator";
 
 export type OperationStepId = "input" | "verify" | "generate" | "execute";
 
@@ -26,7 +27,12 @@ export function useStepGate(_stepId: OperationStepId): { allowed: boolean; reaso
 }
 
 function OperationLayout(): ReactElement {
-  return <Outlet />;
+  return (
+    <>
+      <HubStatusIndicator />
+      <Outlet />
+    </>
+  );
 }
 
 export const router = createBrowserRouter([

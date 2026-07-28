@@ -116,6 +116,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RevisionConflictError'
+  /api/v1/hubs:
+    get:
+      summary: List known Hubs and their connectivity state (operator-facing, for the Hub status indicator)
+      operationId: listHubs
+      responses:
+        '200':
+          description: Hubs ordered by most recently active first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HubSummary'
   /api/v1/hubs/{hubId}/jobs/next:
     get:
       summary: Long-poll the next Hub job
@@ -309,6 +322,33 @@ components:
         expectedButtonText: { type: string, minLength: 1 }
         expectedRedirectUrl: { type: string, format: uri }
         expectedRedirectDomain: { type: string, minLength: 1 }
+    HubSummary:
+      type: object
+      required: [id, name, connectionStatus, transport, platform, deviceReady, runnerReady, createdAt]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+        connectionStatus:
+          type: string
+          enum: [ONLINE, OFFLINE]
+        transport:
+          type: string
+          enum: [WEBSOCKET, HTTPS_POLLING]
+        platform:
+          type: string
+          enum: [ANDROID, WEB]
+        deviceReady:
+          type: boolean
+        runnerReady:
+          type: boolean
+        lastHeartbeatAt:
+          anyOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/Timestamp'
     HubEnvelopeV1:
       oneOf:
         - $ref: '#/components/schemas/JobOfferedEnvelope'
