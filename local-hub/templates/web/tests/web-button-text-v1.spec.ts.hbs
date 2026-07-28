@@ -1,0 +1,21 @@
+import zaloApp from '../pages/zalo-app.page';
+import bottomTabBar from '../pages/bottom-tab-bar.page';
+import messagesTab from '../pages/messages-tab.page';
+import zBusinessChat from '../pages/zbusiness-chat.page';
+
+const test = it;
+const OA_NAME = {{{json oaName}}};
+const EXPECTED_BUTTON_TEXT = {{{json expectedButtonText}}};
+
+describe('@web OA button text', () => {
+  beforeEach(async () => {
+    await zaloApp.open();
+    await bottomTabBar.openMessagesTab();
+    await messagesTab.openConversation(OA_NAME);
+    await zBusinessChat.waitForOpened();
+  });
+
+  test('shows the expected button text on the latest card', async () => {
+    await zBusinessChat.checkButtonText(EXPECTED_BUTTON_TEXT);
+  });
+});

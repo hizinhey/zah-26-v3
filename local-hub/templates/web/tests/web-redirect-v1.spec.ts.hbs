@@ -1,0 +1,22 @@
+import zaloApp from '../pages/zalo-app.page';
+import bottomTabBar from '../pages/bottom-tab-bar.page';
+import messagesTab from '../pages/messages-tab.page';
+import zBusinessChat from '../pages/zbusiness-chat.page';
+
+const test = it;
+const OA_NAME = {{{json oaName}}};
+const EXPECTED_REDIRECT_URL = {{{json expectedRedirectUrl}}};
+
+describe('@web OA redirect', () => {
+  beforeEach(async () => {
+    await zaloApp.open();
+    await bottomTabBar.openMessagesTab();
+    await messagesTab.openConversation(OA_NAME);
+    await zBusinessChat.waitForOpened();
+  });
+
+  test('opens the configured redirect URL from the latest card', async () => {
+    await zBusinessChat.tapLastCardButton();
+    await zBusinessChat.checkRedirectUrl(EXPECTED_REDIRECT_URL);
+  });
+});

@@ -1,0 +1,40 @@
+{
+  "catalogVersion": "web-v1",
+  "templates": [
+    {
+      "id": "web-oa-delivery-v1",
+      "version": 1,
+      "path": "tests/web-oa-delivery-v1.spec.ts.hbs",
+      "sha256": "8227c41e3d72efaf46aa84ad4015f4e1b375c1340d08a3b942bda020205d4d37",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "web-thumbnail-v1",
+      "version": 1,
+      "path": "tests/web-thumbnail-v1.spec.ts.hbs",
+      "sha256": "ecde058d750c87ba8e2d1ca51714fc9ba4e84df595615bd9942725e3b63a8075",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "web-content-v1",
+      "version": 1,
+      "path": "tests/web-content-v1.spec.ts.hbs",
+      "sha256": "b3791ba0c3d98c2f61d7b58a2a6d7d507c5db7386d82918cf1f59416cb97fd8e",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "web-button-text-v1",
+      "version": 1,
+      "path": "tests/web-button-text-v1.spec.ts.hbs",
+      "sha256": "3cbb3f81338e5c3f12eb7cc3e26dec11fa8b4ecf3f2d5f7bac2d32266211bea3",
+      "parameterSchema": "template-parameters-v1"
+    },
+    {
+      "id": "web-redirect-v1",
+      "version": 1,
+      "path": "tests/web-redirect-v1.spec.ts.hbs",
+      "sha256": "d9fce69c3dd55cb4cb953d603677685afd89270598e1dda9bcdd32bf8a8c8bb1",
+      "parameterSchema": "template-parameters-v1"
+    }
+  ]
+}
