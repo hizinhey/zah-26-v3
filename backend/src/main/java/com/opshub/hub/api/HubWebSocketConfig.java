@@ -1,5 +1,6 @@
 package com.opshub.hub.api;
 
+import com.opshub.hub.application.HubConnectionService;
 import com.opshub.hub.application.HubTokenValidator;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.server.ServerHttpRequest;
@@ -81,16 +82,22 @@ public class HubWebSocketConfig implements WebSocketConfigurer {
          * only that Hub's platform - without this, an ANDROID Hub could be offered a WEB job and
          * crash rendering an unknown template id. Defaults to ANDROID for Hubs that predate this
          * header (every Hub before WEB support existed).
+         *
+         * <p>Every value this method can return is normalized via
+         * {@link HubConnectionService#normalizePlatform} - always exactly "ANDROID" or "WEB",
+         * never a raw/malformed header value - so the platform stashed in this handshake's
+         * session attributes (and later used for both writes like markOnline/heartbeat and reads
+         * like offerNextJob/renewActiveLease) can never disagree with itself.
          */
         private String extractPlatform(ServerHttpRequest request) {
             String header = request.getHeaders().getFirst("X-Hub-Platform");
             if (header != null) {
-                return header;
+                return HubConnectionService.normalizePlatform(header);
             }
             if (request instanceof ServletServerHttpRequest servletRequest) {
                 String param = servletRequest.getServletRequest().getParameter("platform");
                 if (param != null) {
-                    return param;
+                    return HubConnectionService.normalizePlatform(param);
                 }
             }
             return "ANDROID";

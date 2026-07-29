@@ -52,9 +52,13 @@ public class HubPollingController {
     public ResponseEntity<HubEnvelopeV1> next(@PathVariable UUID hubId,
                                                @RequestParam(defaultValue = "25") long waitSeconds,
                                                @RequestHeader("X-Hub-Token") String token,
-                                               @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String platform)
+                                               @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String rawPlatform)
             throws InterruptedException {
         requireValidToken(token);
+        // Normalize once, here, at the boundary - see HubConnectionService.normalizePlatform's
+        // javadoc for why the write below (markOnline) and the read below (offerNextJob) must
+        // see the exact same canonical value, not the raw header.
+        String platform = HubConnectionService.normalizePlatform(rawPlatform);
         hubConnectionService.markOnline(hubId, "HTTPS_POLLING", platform);
         long capped = Math.min(waitSeconds, hubProperties.getPollWaitCapSeconds());
         Instant deadline = Instant.now().plusSeconds(capped);
@@ -70,9 +74,10 @@ public class HubPollingController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat(@PathVariable UUID hubId, @RequestHeader("X-Hub-Token") String token,
-                                           @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String platform,
+                                           @RequestHeader(value = "X-Hub-Platform", defaultValue = "ANDROID") String rawPlatform,
                                            @RequestBody HubEnvelopeV1 envelope) {
         requireValidToken(token);
+        String platform = HubConnectionService.normalizePlatform(rawPlatform);
         var payload = new com.fasterxml.jackson.databind.ObjectMapper()
                 .convertValue(envelope.payload(), com.opshub.hub.domain.HubPayloads.HeartbeatPayload.class);
         hubConnectionService.heartbeat(hubId, "HTTPS_POLLING", payload.deviceReady(), payload.runnerReady(), platform);

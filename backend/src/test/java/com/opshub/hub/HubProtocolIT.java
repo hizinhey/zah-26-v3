@@ -239,6 +239,50 @@ class HubProtocolIT {
                 "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
                 HttpMethod.GET, new HttpEntity<>(webHeaders), HubEnvelopeV1.class, port, hubId);
         assertThat(webOffer.getStatusCode().value()).isEqualTo(200);
+
+        // A second ANDROID offer must still be refused (204, nothing to offer) - the WEB lease
+        // does not block it, but ANDROID's own active lease does. Formerly covered only by
+        // ExecutionServiceTest#aHubCanHoldOneActiveAndroidLeaseAndOneActiveWebLeaseAtTheSameTime
+        // (moved here as part of the final whole-branch review - see that class's git history -
+        // since this class exercises the real HTTP endpoints end-to-end while
+        // ExecutionServiceTest shares one Testcontainers Postgres instance across the whole class
+        // with no cleanup between tests, a documented pre-existing source of intra-class
+        // pollution unrelated to this branch).
+        ResponseEntity<HubEnvelopeV1> secondAndroidOffer = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=1",
+                HttpMethod.GET, new HttpEntity<>(androidHeaders), HubEnvelopeV1.class, port, hubId);
+        assertThat(secondAndroidOffer.getStatusCode().value()).isEqualTo(204);
+    }
+
+    /**
+     * Regression test for the final whole-branch review finding I3: normalization of the
+     * X-Hub-Platform header used to happen only when *writing* to hub_platforms
+     * (HubConnectionService.upsert coerced any non-"WEB" value to "ANDROID"), while the read
+     * side (ExecutionService.requireHubPlatformOnline/LeaseService) queried by the raw,
+     * un-normalized header value. A stray/malformed header - lowercase "android" here - would
+     * have written an "ANDROID" hub_platforms row via markOnline, then immediately failed to
+     * find that same row when queried by the raw "android" string, throwing
+     * HubNotOnlineException (mapped to 409) on every single request, forever - no self-healing.
+     * Normalization now happens once, at the boundary (HubPollingController /
+     * HubWebSocketConfig.extractPlatform), so the write and the read in this same request always
+     * agree.
+     */
+    @Test
+    void aStrayPlatformHeaderValueIsNormalizedIdenticallyForTheWriteAndTheReadSoDispatchSelfHeals() {
+        UUID operationId = createApprovedOperation("MOB-824");
+        executionService.start(operationId, 1, "stray-platform-" + UUID.randomUUID());
+        UUID hubId = UUID.randomUUID();
+
+        HttpHeaders strayHeaders = new HttpHeaders();
+        strayHeaders.set("X-Hub-Token", TOKEN);
+        strayHeaders.set("X-Hub-Platform", "android"); // lowercase - malformed relative to the
+        // hub_platforms.platform CHECK constraint, which only allows exactly "ANDROID"/"WEB".
+
+        ResponseEntity<HubEnvelopeV1> offer = restTemplate.exchange(
+                "http://localhost:{port}/api/v1/hubs/{hubId}/jobs/next?waitSeconds=5",
+                HttpMethod.GET, new HttpEntity<>(strayHeaders), HubEnvelopeV1.class, port, hubId);
+
+        assertThat(offer.getStatusCode().value()).isEqualTo(200);
     }
 
     // Exercises HubQueryService.listHubs()'s real hubs/hub_platforms LEFT JOIN against a real
