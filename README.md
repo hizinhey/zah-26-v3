@@ -71,9 +71,9 @@ Local Hub (`local-hub/.env`, git-ignored):
 | `OPSHUB_BACKEND_URL` | Base URL of the OpsHub backend |
 | `OPSHUB_HUB_ID` | This Hub's identifier |
 | `OPSHUB_HUB_TOKEN` | Must match the backend's `OPSHUB_HUB_TOKEN` |
-| `OPSHUB_TEMPLATE_DIR` | Path to the Android WebdriverIO template catalog |
+| `OPSHUB_TEMPLATE_DIR` | Parent directory containing one WebdriverIO template-catalog subdirectory per platform (`android/`, `web/`) - not the catalog itself |
 | `OPSHUB_WORK_DIR` | Writable data root (Outbox, rendered specs, evidence staging, journal) |
-| `OPSHUB_PLATFORM` | Optional; `ANDROID` (default) or `WEB` |
+| `OPSHUB_PLATFORMS` | Optional; comma-separated list of platforms this Hub process runs concurrently, one thread per platform (e.g. `ANDROID,WEB`). Defaults to `ANDROID` only |
 | `OPSHUB_WDIO_PROJECT_DIR` | A real, installed WebdriverIO project (`wdio.conf.ts`/`wdio.web.conf.ts`, `tsconfig.json`, `node_modules`) every execution's rendered spec is run against - required for both platforms |
 | `OPSHUB_NODE_EXECUTABLE` | Node.js 20+ binary used to run the pinned WebdriverIO CLI directly |
 

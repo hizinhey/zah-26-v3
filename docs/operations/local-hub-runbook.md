@@ -38,9 +38,9 @@ values:
 | `OPSHUB_BACKEND_URL` | Base URL of the OpsHub backend (e.g. `https://opshub.example.internal`) |
 | `OPSHUB_HUB_ID` | This Hub's identifier, used in both transport URLs |
 | `OPSHUB_HUB_TOKEN` | Shared bearer token presented on every Hub-facing request (`X-Hub-Token` header / WebSocket `token` query param). Must match `OPSHUB_HUB_TOKEN` in `deploy/env/backend.env` on the backend side |
-| `OPSHUB_TEMPLATE_DIR` | Path to the WebdriverIO template catalog (`local-hub/templates/android` in this repo) |
+| `OPSHUB_TEMPLATE_DIR` | Parent directory containing one WebdriverIO template-catalog subdirectory per platform this Hub runs — `android/` and/or `web/` (`local-hub/templates` in this repo) — not the catalog itself; the Hub derives each platform's actual catalog root as `OPSHUB_TEMPLATE_DIR/<platform-lowercased>` |
 | `OPSHUB_WORK_DIR` | Writable data root for the Outbox database, rendered specs, evidence staging, and journal |
-| `OPSHUB_PLATFORM` | Optional; `ANDROID` (default) or `WEB`. Selects preflight profile, Runner wiring, and which config file (`wdio.conf.ts` vs `wdio.web.conf.ts`) is materialized into every execution directory — see section 4 for `WEB` |
+| `OPSHUB_PLATFORMS` | Optional; comma-separated list of platforms this Hub process runs **concurrently**, one thread per platform, each fully isolated (its own journal/outbox/transport/Runner) — e.g. `ANDROID,WEB`. Defaults to `ANDROID` only. Selects preflight profile, Runner wiring, and which config file (`wdio.conf.ts` vs `wdio.web.conf.ts`) is materialized into every execution directory per platform — see section 4 for `WEB` |
 | `OPSHUB_WDIO_PROJECT_DIR` | A real, installed WebdriverIO project — required for **both** platforms, since a WEB Hub needs the same pinned Node/dependencies as ANDROID, just a different config file inside the same project root: `wdio.conf.ts` (ANDROID) and/or `wdio.web.conf.ts` (WEB), plus `tsconfig.json`, `node_modules` — e.g. this repo's `mobile_script/` directory, installed locally per runner host, never committed. Without this the runner has no config or dependencies to run a spec with |
 | `OPSHUB_NODE_EXECUTABLE` | Node.js 20+ binary used to run the pinned WebdriverIO CLI directly, bypassing whatever `node` (if any, and whatever version) happens to be first on `PATH` |
 
@@ -93,15 +93,28 @@ adb shell pm list packages com.zing.zalo      # Zalo installed
 ## 4. Web (Zalo Web) platform
 
 The Web execution path drives `chat.zalo.me` in desktop Chrome via
-WebdriverIO — no Appium, no adb, no mobile device. The backend spawns this
-worker itself (`opshub.web-worker.*` properties in `application.yml`/env,
-disabled by default) rather than it running as an always-on service.
+WebdriverIO — no Appium, no adb, no mobile device. It is not a separate
+service: it is just another entry in the same Local Hub process's
+`OPSHUB_PLATFORMS` list, running in its own thread alongside ANDROID (if
+also configured) with its own journal/outbox/transport/Runner, always-on
+exactly like Android — there is no backend-side on-demand spawn, and no
+separate backend `opshub.web-worker.*` configuration (that mechanism has
+been retired; the backend no longer launches or manages any Local Hub
+process itself).
+
+To enable it, add `WEB` to `OPSHUB_PLATFORMS` on a Local Hub whose host has
+desktop Chrome available (e.g. `OPSHUB_PLATFORMS=ANDROID,WEB` to run both
+platforms from one Hub identity, or `OPSHUB_PLATFORMS=WEB` for a
+Web-only Hub).
 
 One-time setup on the host that will run it:
 
-1. Provision a Node project on the backend host containing `wdio.web.conf.ts`
-   at its root (same `node_modules`/`package.json` an ANDROID Local Hub would
-   use, alongside `wdio.conf.ts` if the same host also runs Android - WebdriverIO
+1. `OPSHUB_TEMPLATE_DIR` must have a `web/` subdirectory (this repo's
+   `local-hub/templates/web`) alongside `android/` if the same Hub also runs
+   ANDROID — see section 2.
+2. `OPSHUB_WDIO_PROJECT_DIR` must contain `wdio.web.conf.ts` at its root
+   (the same `node_modules`/`package.json` an ANDROID Hub would use,
+   alongside `wdio.conf.ts` if the same host also runs Android — WebdriverIO
    v9 manages its own matching chromedriver, no separate driver install
    needed). `wdio.web.conf.ts` needs a plain `browserName: 'chrome'`
    capability with `'goog:chromeOptions': { args: ['--user-data-dir=<profile-dir>'] } }`,
@@ -110,34 +123,24 @@ One-time setup on the host that will run it:
    every test (creating the `evidence/` directory first if it doesn't
    exist) — this is how `WebScreenshotCapturer`
    (`local-hub/src/opshub_hub/browser_control.py`) picks up each test's
-   evidence. This is the same project `opshub.web-worker.wdio-project-root`
-   (step 3) will point at - unlike Android, the backend-launched Web worker
-   has no `local-hub/.env` of its own to read `OPSHUB_WDIO_PROJECT_DIR` from.
-2. Open that Chrome profile once manually and scan the Zalo QR login code
+   evidence.
+3. Open that Chrome profile once manually and scan the Zalo QR login code
    with a dedicated test account's phone. The profile directory now stays
-   signed in across runs; point `opshub.web-worker.data-root`'s
-   `chrome-profile` subdirectory (or whichever path `wdio.web.conf.ts`'s
-   `--user-data-dir` uses) at it.
-3. Set `opshub.web-worker.enabled=true` and the rest of the
-   `opshub.web-worker.*` properties on the backend: `python-executable`,
-   `working-directory` — the Local Hub checkout with its Python venv
-   already installed — `hub-id` — **must be a real UUID string** the
-   backend's `hubs` table can key on, the default `web-worker` is a
-   placeholder that will fail to connect — `backend-url`, `template-root`
-   pointing at `local-hub/templates/web`, `data-root`, `wdio-project-root`
-   (step 1's project) and `node-executable` (a Node 20+ binary) — these last
-   two are passed to the spawned worker as `OPSHUB_WDIO_PROJECT_DIR`/
-   `OPSHUB_NODE_EXECUTABLE`, required unconditionally by every Local Hub
-   process regardless of platform (section 2).
+   signed in across runs; point `wdio.web.conf.ts`'s `--user-data-dir` at
+   the Hub's `OPSHUB_WORK_DIR/chrome-profile` directory (created
+   automatically the first time the WEB thread runs) so the same signed-in
+   profile is reused on every subsequent run.
 
-Unlike Android, this Hub isn't started manually — the backend launches it
-(`WebWorkerLauncher`) the first time an operator starts an execution
-against a `WEB`-platform Operation, then it keeps running its normal poll
-loop exactly like a manually started Android Hub (`WebWorkerLauncher` only
-guards against launching a second worker process while one is already
-alive). Sequential only: only one Web worker process runs at a time, so a
-second Web execution is queued and served once the first job's lease is
-released, the same lease mechanism every Hub already uses.
+Once those three are in place, start the Hub the same way as an
+ANDROID-only Hub (section 1) — the WEB thread runs its normal preflight
+(checking the pinned Node executable, the template catalog, and the
+Chrome/WebdriverIO project — no `adb`, no Appium, no device) then its
+normal poll loop exactly like the ANDROID thread, concurrently, for as
+long as the process runs. As with any platform, a Hub can hold at most one
+active WEB job at a time — one row per (hub, platform) in `hub_platforms`
+and `job_leases` enforces this per platform independently, so an active
+ANDROID lease never blocks a WEB job from being offered on the same Hub,
+and vice versa.
 
 ## 5. Starting Appium
 

@@ -83,6 +83,15 @@ def load_config(env: dict | None = None) -> HubConfig:
     missing = [name for name in _ENV_MAP.values() if not source.get(name)]
     if missing:
         raise ValueError(f"Missing required Local Hub environment variables: {', '.join(missing)}")
+    if source.get("OPSHUB_PLATFORM") and not source.get("OPSHUB_PLATFORMS"):
+        # OPSHUB_PLATFORM (singular) was renamed to OPSHUB_PLATFORMS (plural, comma-separated)
+        # when this Hub gained the ability to run more than one platform at once. Silently
+        # defaulting to ANDROID-only here would misconfigure an operator who forgot to update
+        # their .env after upgrading - loud and actionable beats silent and wrong.
+        raise ValueError(
+            "OPSHUB_PLATFORM has been renamed to OPSHUB_PLATFORMS (comma-separated) - "
+            "set OPSHUB_PLATFORMS instead"
+        )
     platforms_raw = source.get("OPSHUB_PLATFORMS") or "ANDROID"
     platforms = tuple(p.strip() for p in platforms_raw.split(",") if p.strip())
     return HubConfig(

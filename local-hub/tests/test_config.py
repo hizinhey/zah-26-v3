@@ -38,6 +38,23 @@ def test_platform_template_root_derives_a_per_platform_subdirectory():
     assert str(config.platform_template_root("WEB")) == "/tmp/templates/web"
 
 
+def test_the_old_singular_platform_env_var_raises_a_loud_rename_error():
+    """OPSHUB_PLATFORM (singular) was renamed to OPSHUB_PLATFORMS (plural, comma-separated).
+    An operator who forgot to update their .env after upgrading must get a loud, actionable
+    error instead of silently falling back to an ANDROID-only default."""
+    env = _base_env(OPSHUB_PLATFORM="ANDROID")
+
+    with pytest.raises(ValueError, match="OPSHUB_PLATFORM has been renamed to OPSHUB_PLATFORMS"):
+        load_config(env)
+
+
+def test_the_old_singular_platform_env_var_is_ignored_once_the_new_one_is_also_set():
+    """If both are set (e.g. mid-migration), the new OPSHUB_PLATFORMS wins and no error is
+    raised - only the "old var set, new var completely unset" case should be loud."""
+    config = load_config(_base_env(OPSHUB_PLATFORM="ANDROID", OPSHUB_PLATFORMS="WEB"))
+    assert config.platforms == ("WEB",)
+
+
 def test_both_platforms_require_wdio_project_and_node_executable_env_vars():
     for platform_overrides in ({}, {"OPSHUB_PLATFORMS": "WEB"}):
         env = _base_env(**platform_overrides)
