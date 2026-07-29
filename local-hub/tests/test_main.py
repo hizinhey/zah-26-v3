@@ -11,6 +11,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from opshub_hub.config import HubConfig
 from opshub_hub.main import _heartbeat_while_running, build_runner
 from opshub_hub.main import build_web_runner
@@ -153,3 +155,99 @@ def test_run_platform_logs_and_returns_without_raising_when_preflight_fails(tmp_
         "a failed preflight must log and return, not raise - one platform's broken environment "
         "must not crash the whole multi-platform Hub process"
     )
+
+
+def test_run_platform_does_not_mark_entered_loop_when_preflight_fails(tmp_path):
+    """Companion to the isolation test above: proves the shared `entered_loop` signal stays
+    False when a platform never makes it past preflight, which is exactly what `run_forever`
+    relies on to tell a genuine "nothing is running" state apart from a clean shutdown."""
+    from opshub_hub.main import _run_platform
+
+    config = HubConfig(
+        backend_url="https://backend.example.test",
+        hub_id="hub-1",
+        hub_token="token",
+        template_root=tmp_path / "nonexistent-templates",
+        data_root=tmp_path,
+        platforms=("ANDROID",),
+        wdio_project_root=tmp_path / "nonexistent-wdio-project",
+        node_executable=Path("/usr/bin/node"),
+    )
+    entered_loop: dict[str, bool] = {"ANDROID": False}
+
+    _run_platform(config, "ANDROID", entered_loop)
+
+    assert entered_loop == {"ANDROID": False}
+
+
+def test_run_forever_raises_system_exit_when_every_configured_platform_fails_preflight(tmp_path):
+    """I1 regression test: pre-branch behavior was `raise SystemExit(...)` when preflight
+    failed. This branch's per-platform isolation (see `_run_platform`) means a single bad
+    platform must NOT crash the process - but if *every* configured platform fails preflight
+    (or `config.platforms` ends up empty, e.g. a whitespace-only `OPSHUB_PLATFORMS`), silently
+    returning is indistinguishable from a clean shutdown to systemd/Docker restart policies and
+    monitoring. `run_forever` must refuse to stay up in that case."""
+    from opshub_hub.main import run_forever
+
+    config = HubConfig(
+        backend_url="https://backend.example.test",
+        hub_id="hub-1",
+        hub_token="token",
+        template_root=tmp_path / "nonexistent-templates",
+        data_root=tmp_path,
+        platforms=("ANDROID", "WEB"),
+        wdio_project_root=tmp_path / "nonexistent-wdio-project",
+        node_executable=Path("/usr/bin/node"),
+    )
+
+    with pytest.raises(SystemExit, match="No platform session is running"):
+        run_forever(config)
+
+
+def test_run_forever_raises_system_exit_when_platforms_is_empty(tmp_path):
+    """Same guard, degenerate-config path: zero platforms configured means zero threads spawned,
+    which must not look like a clean shutdown either."""
+    from opshub_hub.main import run_forever
+
+    config = HubConfig(
+        backend_url="https://backend.example.test",
+        hub_id="hub-1",
+        hub_token="token",
+        template_root=tmp_path / "templates",
+        data_root=tmp_path,
+        platforms=(),
+        wdio_project_root=tmp_path / "wdio-project",
+        node_executable=Path("/usr/bin/node"),
+    )
+
+    with pytest.raises(SystemExit, match="No platform session is running"):
+        run_forever(config)
+
+
+def test_run_forever_does_not_raise_when_at_least_one_platform_enters_its_loop(monkeypatch, tmp_path):
+    """The counterpart to the "everything failed" tests above: as long as at least one
+    configured platform actually made it into its receive/execute loop, `run_forever` must not
+    raise - even though another configured platform failed preflight in the same process."""
+    import opshub_hub.main as main_module
+
+    def fake_run_platform(config, platform, entered_loop=None):
+        # Simulate ANDROID succeeding (entering its loop) and WEB failing preflight - and, for
+        # the test's sake, returning immediately either way instead of looping forever, since
+        # real success never returns.
+        if entered_loop is not None and platform == "ANDROID":
+            entered_loop[platform] = True
+
+    monkeypatch.setattr(main_module, "_run_platform", fake_run_platform)
+
+    config = HubConfig(
+        backend_url="https://backend.example.test",
+        hub_id="hub-1",
+        hub_token="token",
+        template_root=tmp_path / "templates",
+        data_root=tmp_path,
+        platforms=("ANDROID", "WEB"),
+        wdio_project_root=tmp_path / "wdio-project",
+        node_executable=Path("/usr/bin/node"),
+    )
+
+    main_module.run_forever(config)  # must not raise

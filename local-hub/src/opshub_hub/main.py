@@ -149,10 +149,17 @@ def _heartbeat_while_running(transport: FailoverTransport, interval: float = HEA
         thread.join(timeout=interval)
 
 
-def _run_platform(config: HubConfig, platform: str) -> None:
+def _run_platform(config: HubConfig, platform: str, entered_loop: dict[str, bool] | None = None) -> None:
     """Runs one platform's full preflight-connect-loop pipeline to completion (or until the
     process is killed). Isolated per platform: a failure here does not affect any other
-    platform thread running in the same process."""
+    platform thread running in the same process.
+
+    `entered_loop`, if given, is a shared dict (keyed by platform) that this function sets to
+    True right before it starts its receive/execute loop - i.e. once preflight has actually
+    succeeded and this platform is really about to start serving jobs. `run_forever` uses this
+    after joining all threads to tell "every platform's preflight failed" (or `config.platforms`
+    was empty) apart from a normal, healthy shutdown - see run_forever's docstring.
+    """
     try:
         if platform == "WEB":
             chrome_profile_dir = config.data_root / "chrome-profile"
@@ -203,6 +210,9 @@ def _run_platform(config: HubConfig, platform: str) -> None:
 
     runner = build_web_runner(config, transport, outbox) if platform == "WEB" else build_runner(config, transport, outbox)
 
+    if entered_loop is not None:
+        entered_loop[platform] = True
+
     while True:
         outbox.flush(transport)
         job = transport.receive_job()
@@ -223,6 +233,18 @@ def _run_platform(config: HubConfig, platform: str) -> None:
 
 
 def run_forever(config: HubConfig | None = None) -> None:
+    """Starts one thread per configured platform and blocks until all of them exit.
+
+    In healthy operation this call never returns: every thread's `_run_platform` loop runs
+    forever. `thread.join()` only completes early for a thread whose platform failed preflight
+    (see `_run_platform`'s isolation behavior - that failure is logged and the thread returns,
+    it is not raised). If *every* thread returns this way - including the degenerate case of
+    `config.platforms` being empty, e.g. a whitespace-only `OPSHUB_PLATFORMS` - this function
+    would otherwise return normally, which is indistinguishable from a clean shutdown to
+    systemd/Docker restart policies and monitoring. `entered_loop` is used to tell the two
+    apart: raise `SystemExit` unless at least one platform actually made it into its
+    receive/execute loop.
+    """
     config = config or load_config()
 
     # De-duplicate: config.platforms doesn't guarantee uniqueness (e.g. "ANDROID,ANDROID" is
@@ -231,14 +253,26 @@ def run_forever(config: HubConfig | None = None) -> None:
     # connection for that platform. dict.fromkeys preserves first-seen order.
     platforms = tuple(dict.fromkeys(config.platforms))
 
+    entered_loop: dict[str, bool] = {platform: False for platform in platforms}
+
     threads = [
-        threading.Thread(target=_run_platform, args=(config, platform), name=f"opshub-hub-{platform.lower()}", daemon=False)
+        threading.Thread(
+            target=_run_platform,
+            args=(config, platform, entered_loop),
+            name=f"opshub-hub-{platform.lower()}",
+            daemon=False,
+        )
         for platform in platforms
     ]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
+
+    if not any(entered_loop.values()):
+        raise SystemExit(
+            f"No platform session is running (configured: {config.platforms}); refusing to stay up."
+        )
 
 
 if __name__ == "__main__":
