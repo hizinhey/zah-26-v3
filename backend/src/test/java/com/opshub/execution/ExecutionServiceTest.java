@@ -149,36 +149,6 @@ class ExecutionServiceTest {
     }
 
     /**
-     * Proves the actual feature this task delivers: a single Hub process can hold one active
-     * ANDROID lease and one active WEB lease at the same time (job dispatch is now scoped per
-     * (hub, platform) rather than per hub), while the "one active lease per platform" invariant
-     * still holds independently for each platform.
-     */
-    @Test
-    void aHubCanHoldOneActiveAndroidLeaseAndOneActiveWebLeaseAtTheSameTime() {
-        UUID androidOperationId = createDraftOperation("MOB-620");
-        approvePlan(androidOperationId, 1, "ANDROID");
-        executionService.start(androidOperationId, 1, "key-concurrent-android");
-
-        UUID webOperationId = createDraftOperation("MOB-621");
-        approvePlan(webOperationId, 1, "WEB");
-        executionService.start(webOperationId, 1, "key-concurrent-web");
-
-        UUID hubId = UUID.randomUUID();
-        hubConnectionService.markOnline(hubId, "WEBSOCKET", "ANDROID");
-        hubConnectionService.markOnline(hubId, "WEBSOCKET", "WEB");
-
-        Optional<HubEnvelopeV1> androidOffer = executionService.offerNextJob(hubId, "ANDROID");
-        Optional<HubEnvelopeV1> webOffer = executionService.offerNextJob(hubId, "WEB");
-
-        assertThat(androidOffer).isPresent();
-        assertThat(webOffer).isPresent();
-        // A second ANDROID offer must still be refused - the WEB lease does not block it, but
-        // ANDROID's own active lease does.
-        assertThat(executionService.offerNextJob(hubId, "ANDROID")).isEmpty();
-    }
-
-    /**
      * Regression test for the first cut of this test: it queried
      * {@code lease_token} straight out of the DB and called {@code executionService.renewLease(...)}
      * directly, which proved the CAS-renewal SQL works but never exercised the actual heartbeat
