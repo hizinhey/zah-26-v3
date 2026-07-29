@@ -42,10 +42,46 @@ class ZBusinessChatScreen {
     await thumbnail.waitForDisplayed();
     const location = await thumbnail.getLocation();
     const size = await thumbnail.getSize();
+    const rect = { left: Math.round(location.x), top: Math.round(location.y), width: Math.round(size.width), height: Math.round(size.height) };
     const screenshot = Buffer.from(await driver.takeScreenshot(), 'base64');
-    const actual = await sharp(screenshot).extract({ left: Math.round(location.x), top: Math.round(location.y), width: Math.round(size.width), height: Math.round(size.height) }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const reference = await sharp(await this.downloadImage(referenceImageUrl)).resize(actual.info.width, actual.info.height, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    return pixelmatch(actual.data, reference.data, undefined, actual.info.width, actual.info.height, { threshold: 0.1 }) / (actual.info.width * actual.info.height) <= 0.05;
+    const referenceBuffer = await this.downloadImage(referenceImageUrl);
+    const actual = await sharp(screenshot).extract(rect).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // fit: 'cover' (not 'fill'): the reference image's native aspect ratio rarely matches the
+    // on-device thumbnail box exactly (e.g. 1844x1154 vs a 1364x880 crop - close but not equal).
+    // 'fill' stretches non-uniformly to force an exact fit, which shifts every edge by a few
+    // pixels and inflates the diff ratio well past the 5% threshold even for the *same* image
+    // (verified: an identical pair scored 11.78% under 'fill' vs 1.26% under 'cover'). 'cover'
+    // preserves the aspect ratio (cropping any excess) like the on-device thumbnail rendering
+    // itself does, so it doesn't manufacture a mismatch out of a harmless ratio difference.
+    const reference = await sharp(referenceBuffer).resize(actual.info.width, actual.info.height, { fit: 'cover' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const diffRatio = pixelmatch(actual.data, reference.data, undefined, actual.info.width, actual.info.height, { threshold: 0.1 }) / (actual.info.width * actual.info.height);
+    const matches = diffRatio <= 0.05;
+    // Evidence capture (runner.py's _capture_and_upload_evidence) only ever grabs a full-screen
+    // adb screenshot *after* the whole spec (incl. the after() hook's terminateApp) has finished
+    // - by then Zalo is closed and the evidence photo is just the home screen, useless for
+    // diagnosing a thumbnail *content* mismatch. So on a mismatch, save the two images that were
+    // actually compared - the cropped on-device thumbnail and the resized reference - right here,
+    // while we still have them, so a future failure can be visually inspected.
+    if (!matches) {
+      await this.saveThumbnailMismatchEvidence(screenshot, rect, referenceBuffer, actual.info.width, actual.info.height);
+    }
+    return matches;
+  }
+  private async saveThumbnailMismatchEvidence(
+    screenshot: Buffer, rect: { left: number; top: number; width: number; height: number },
+    referenceBuffer: Buffer, width: number, height: number,
+  ): Promise<void> {
+    try {
+      const fs = require('fs') as typeof import('fs');
+      const path = require('path') as typeof import('path');
+      const evidenceDir = path.resolve(process.cwd(), 'evidence');
+      fs.mkdirSync(evidenceDir, { recursive: true });
+      await sharp(screenshot).extract(rect).png().toFile(path.join(evidenceDir, 'thumbnail-mismatch-actual.png'));
+      await sharp(referenceBuffer).resize(width, height, { fit: 'cover' }).png().toFile(path.join(evidenceDir, 'thumbnail-mismatch-reference.png'));
+      console.log(`[ZBusinessChatScreen] Thumbnail mismatch - saved actual/reference to ${evidenceDir}`);
+    } catch (err) {
+      console.log('[ZBusinessChatScreen] Failed to save thumbnail mismatch evidence:', err);
+    }
   }
   private downloadImage(url: string): Promise<Buffer> {
     return new Promise((resolve, reject) => https.get(url, response => {
