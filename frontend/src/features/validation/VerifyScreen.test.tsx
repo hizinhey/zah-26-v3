@@ -105,7 +105,7 @@ describe("VerifyScreen", () => {
 
     expect(screen.getByText("Input Issues Found")).toBeInTheDocument();
     expect(screen.getByText("OA #1")).toBeInTheDocument();
-    expect(screen.getAllByText("Complete").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Passed").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Missing Input").length).toBeGreaterThan(0);
   });
 

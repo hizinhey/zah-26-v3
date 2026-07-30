@@ -11,7 +11,13 @@ import { isRevisionConflict, useOperationQuery } from "../operations/useOperatio
 import { usePlanQuery } from "../generation/usePlan";
 import { executionQueryKey, useExecutionQuery, useStartExecutionMutation } from "./useExecution";
 import { useExecutionChannel } from "../../realtime/useExecutionChannel";
-import { applyEnvelope, hydrateFromResults, seedExecutionState, type ExecutionState } from "./executionState";
+import {
+  applyEnvelope,
+  hydrateFromResults,
+  hydrateRunningTestCase,
+  seedExecutionState,
+  type ExecutionState,
+} from "./executionState";
 import { ExecutionQueue, type QueueOa, type QueueStatus } from "./ExecutionQueue";
 import { ExecutionLog } from "./ExecutionLog";
 import { EvidenceModal } from "./EvidenceModal";
@@ -53,14 +59,14 @@ function isTerminal(status: string): boolean {
 type Action =
   | { type: "seed"; testCases: GeneratedTestCase[] }
   | { type: "envelope"; envelope: HubEnvelopeV1 }
-  | { type: "hydrate"; results: ExecutionTestResult[] };
+  | { type: "hydrate"; results: ExecutionTestResult[]; runningTestCaseId: string | null };
 
 function reducer(state: ExecutionState, action: Action): ExecutionState {
   if (action.type === "seed") {
     return seedExecutionState(action.testCases);
   }
   if (action.type === "hydrate") {
-    return hydrateFromResults(state, action.results);
+    return hydrateRunningTestCase(hydrateFromResults(state, action.results), action.runningTestCaseId);
   }
   return applyEnvelope(state, action.envelope);
 }
@@ -98,7 +104,11 @@ export function ExecuteScreen(): ReactElement {
   // this, `results` was fetched but nothing ever applied it to the state the table renders from.
   useEffect(() => {
     if (execution && "results" in execution && execution.results) {
-      dispatch({ type: "hydrate", results: execution.results });
+      dispatch({
+        type: "hydrate",
+        results: execution.results,
+        runningTestCaseId: "runningTestCaseId" in execution ? execution.runningTestCaseId : null,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution]);
@@ -265,7 +275,6 @@ export function ExecuteScreen(): ReactElement {
                       <th>Test Case ID</th>
                       <th>Test Case Description</th>
                       <th>Status</th>
-                      <th>Started At</th>
                       <th>Duration</th>
                       <th>Evidence</th>
                     </tr>
@@ -288,7 +297,6 @@ export function ExecuteScreen(): ReactElement {
                               <span className={styles.attempt}> (attempt {live.attempt})</span>
                             ) : null}
                           </td>
-                          <td>{live?.startedAt ? new Date(live.startedAt).toLocaleTimeString() : "—"}</td>
                           <td>{live?.durationMs != null ? `${(live.durationMs / 1000).toFixed(2)}s` : "—"}</td>
                           <td>
                             {isFailure ? (
@@ -329,18 +337,22 @@ export function ExecuteScreen(): ReactElement {
 
               {tab === "script" ? (
                 <dl className={styles.scriptList}>
-                  {currentOaCases.map((testCase) => (
-                    <div key={testCase.testCaseId}>
-                      <dt>
-                        {TEST_CASE_CATALOG[testCase.templateId]?.label ?? testCaseLabel(testCase.order)} —{" "}
-                        {testCase.templateId} (v{testCase.templateVersion})
-                      </dt>
-                      <dd>Expected header: {testCase.parameters.expectedHeader}</dd>
-                      <dd>Expected body: {testCase.parameters.expectedBody}</dd>
-                      <dd>Expected button text: {testCase.parameters.expectedButtonText}</dd>
-                      <dd>Expected redirect: {testCase.parameters.expectedRedirectUrl}</dd>
-                    </div>
-                  ))}
+                  {currentOaCases.map((testCase) => {
+                    const catalogEntry = TEST_CASE_CATALOG[testCase.templateId];
+                    return (
+                      <div key={testCase.testCaseId}>
+                        <dt>
+                          {catalogEntry?.label ?? testCaseLabel(testCase.order)} — {catalogEntry?.description ?? testCase.templateId}{" "}
+                          ({testCase.templateId} v{testCase.templateVersion})
+                        </dt>
+                        {(catalogEntry?.fields ?? []).map((field) => (
+                          <dd key={field.key}>
+                            {field.label}: {testCase.parameters[field.key]}
+                          </dd>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </dl>
               ) : null}
 

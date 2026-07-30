@@ -47,6 +47,16 @@ public class ExecutionService {
     /** Tracks the last accepted message timestamp per execution to enforce monotonic delivery. */
     private final ConcurrentHashMap<UUID, Instant> lastMessageTimestamps = new ConcurrentHashMap<>();
 
+    /**
+     * Tracks whichever test case a JOB_PROGRESS envelope most recently reported as RUNNING for an
+     * execution, purely so the REST poll ({@link #findById}) can show a live "Running" state
+     * instead of every case sitting at PENDING until its terminal TEST_RESULT lands (the only
+     * thing actually persisted). Same lifecycle/durability tradeoff as {@link #lastMessageTimestamps}:
+     * in-memory only, cleared on execution completion/abandonment, and lost on a backend restart
+     * (acceptable here - a poller just sees PENDING again until the next JOB_PROGRESS arrives).
+     */
+    private final ConcurrentHashMap<UUID, UUID> runningTestCaseByExecution = new ConcurrentHashMap<>();
+
     private static final RowMapper<ExecutionDto> EXECUTION_ROW_MAPPER = (rs, rowNum) -> new ExecutionDto(
             (UUID) rs.getObject("id"),
             (UUID) rs.getObject("operation_id"),
@@ -119,7 +129,7 @@ public class ExecutionService {
                         rs.getString("status"), (Long) rs.getObject("duration_ms"), rs.getString("error_category"),
                         rs.getString("error_message")),
                 executionId);
-        return new ExecutionStatusDto(execution, results);
+        return new ExecutionStatusDto(execution, results, runningTestCaseByExecution.get(executionId));
     }
 
     // I6 fix: duration_ms is NOT NULL BIGINT on the wire and in the DB (V4__widen_duration_ms.sql)
@@ -128,7 +138,7 @@ public class ExecutionService {
     public record TestResultDto(UUID id, UUID testCaseId, int attempt, String status, Long durationMs, String errorCategory, String errorMessage) {
     }
 
-    public record ExecutionStatusDto(ExecutionDto execution, List<TestResultDto> results) {
+    public record ExecutionStatusDto(ExecutionDto execution, List<TestResultDto> results, UUID runningTestCaseId) {
     }
 
     public Optional<ExecutionDto> findByIdempotencyKey(String idempotencyKey) {
@@ -204,6 +214,17 @@ public class ExecutionService {
     public void recordProgress(HubEnvelopeV1 envelope) {
         HubPayloads.JobProgressPayload payload = objectMapper.convertValue(envelope.payload(), HubPayloads.JobProgressPayload.class);
         requireMonotonic(payload.executionId(), envelope.timestamp());
+
+        if ("RUNNING".equals(payload.status())) {
+            runningTestCaseByExecution.put(payload.executionId(), payload.testCaseId());
+        } else {
+            // Any non-RUNNING progress (a terminal status reported via JOB_PROGRESS, not just the
+            // eventual TEST_RESULT) means this test case is no longer the one running - but only
+            // clear the entry if it's still pointing at *this* test case, so a late/duplicate
+            // envelope for a case that already finished can't stomp on a newer case's RUNNING entry.
+            runningTestCaseByExecution.computeIfPresent(payload.executionId(),
+                    (executionId, currentTestCaseId) -> payload.testCaseId().equals(currentTestCaseId) ? null : currentTestCaseId);
+        }
     }
 
     @Transactional
@@ -265,6 +286,7 @@ public class ExecutionService {
             // test case has reached a terminal outcome there is nothing left to reorder-check, and
             // holding the entry forever would leak memory for every execution that ever ran.
             lastMessageTimestamps.remove(executionId);
+            runningTestCaseByExecution.remove(executionId);
         }
     }
 
@@ -320,6 +342,7 @@ public class ExecutionService {
                                 """, Timestamp.from(Instant.now()), execution.id());
                 leaseService.release(execution.id());
                 lastMessageTimestamps.remove(execution.id());
+                runningTestCaseByExecution.remove(execution.id());
             }
         }
     }

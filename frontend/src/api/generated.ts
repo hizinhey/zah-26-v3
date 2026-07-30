@@ -211,6 +211,8 @@ export interface ExecutionStatus {
   sourceRevision: Revision;
   status: string;
   results: ExecutionTestResult[];
+  /** The test case a JOB_PROGRESS envelope most recently reported RUNNING, if any is currently in flight. */
+  runningTestCaseId: Uuid | null;
 }
 
 /** One platform's connectivity/readiness state within a Hub. */

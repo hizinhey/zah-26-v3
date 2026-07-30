@@ -57,12 +57,12 @@ public class ExecutionController {
     }
 
     public record ExecutionStatusResponse(UUID id, UUID operationId, UUID planId, int sourceRevision, String status,
-                                           List<TestResultResponse> results) {
+                                           List<TestResultResponse> results, UUID runningTestCaseId) {
         private static ExecutionStatusResponse from(ExecutionService.ExecutionStatusDto dto) {
             ExecutionDto execution = dto.execution();
             return new ExecutionStatusResponse(execution.id(), execution.operationId(), execution.planId(),
                     execution.sourceRevision(), execution.status(),
-                    dto.results().stream().map(TestResultResponse::from).toList());
+                    dto.results().stream().map(TestResultResponse::from).toList(), dto.runningTestCaseId());
         }
     }
 }

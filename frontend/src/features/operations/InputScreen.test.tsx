@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -49,8 +49,14 @@ function existingOperation(overrides: Partial<Operation> = {}): Operation {
   };
 }
 
+const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
 });
 
 describe("InputScreen", () => {
@@ -79,7 +85,21 @@ describe("InputScreen", () => {
     expect(screen.getByRole("button", { name: "Remove OA #1" })).toBeDisabled();
   });
 
-  it("reorders OAs, moving field values along with the tab", async () => {
+  it("reorders OAs via drag, moving field values along with the tab", async () => {
+    // dnd-kit's collision detection (pointer and keyboard sensors alike) reads real
+    // getBoundingClientRect()s, which jsdom always reports as all-zero. Fake a simple
+    // horizontal layout - one 100px-wide tab per DOM position - so the keyboard sensor
+    // below has real geometry to compare positions against.
+    Element.prototype.getBoundingClientRect = vi.fn(function (this: Element) {
+      const parent = this.parentElement;
+      const index = parent ? Array.from(parent.children).indexOf(this) : 0;
+      const left = index * 100;
+      return {
+        width: 100, height: 40, top: 0, left, right: left + 100, bottom: 40, x: left, y: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+
     const user = userEvent.setup();
     renderScreen("/operations/new/input");
 
@@ -87,8 +107,13 @@ describe("InputScreen", () => {
     await user.click(screen.getByRole("button", { name: "+ Add OA" }));
     await user.type(screen.getByLabelText(/Button Text/), "Second");
 
-    // Active tab is now OA #2 ("Second"); move it earlier so it becomes OA #1.
-    await user.click(screen.getByRole("button", { name: "Move OA #2 earlier" }));
+    // Active tab is now OA #2 ("Second"); pick it up with the keyboard sensor (Space),
+    // move it one slot earlier (ArrowLeft), then drop it (Space).
+    const secondTabHandle = screen.getByTestId("oa-tab-1");
+    secondTabHandle.focus();
+    await user.keyboard("[Space]");
+    await user.keyboard("[ArrowLeft]");
+    await user.keyboard("[Space]");
 
     expect(screen.getByRole("tab", { name: "OA #1", selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText(/Button Text/)).toHaveValue("Second");

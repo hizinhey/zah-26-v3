@@ -10,7 +10,11 @@ function baseProps(props: IconProps): IconProps {
     height: 16,
     viewBox: "0 0 16 16",
     fill: "none",
-    stroke: "currentColor",
+    // Fixed color (not currentColor): PC/Web must look the same whether their
+    // parent button is in the default or the `[data-selected]` (blue text)
+    // state, matching Android's hardcoded green and iOS's fixed-color image —
+    // otherwise these two were the only icons that changed color on selection.
+    stroke: "var(--ops-color-gray-700)",
     strokeWidth: 1.5,
     strokeLinecap: "round",
     strokeLinejoin: "round",

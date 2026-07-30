@@ -29,6 +29,13 @@ const STATUS_SEVERITY: Record<string, number> = {
   PASSED: 0,
 };
 
+const PLATFORM_LABEL: Record<string, string> = {
+  ANDROID: "Android",
+  IOS: "iOS",
+  PC: "PC",
+  WEB: "Web",
+};
+
 interface OaRowSummary {
   oaOrder: number;
   inputComplete: boolean;
@@ -94,6 +101,14 @@ export function VerifyScreen(): ReactElement {
     () => (validationRun ? summarizeByOa(validationRun.findings) : []),
     [validationRun],
   );
+
+  const platformByOaOrder = useMemo(() => {
+    const byOrder = new Map<number, string>();
+    for (const oa of operationQuery.data?.oas ?? []) {
+      byOrder.set(oa.oaOrder, PLATFORM_LABEL[oa.platform] ?? oa.platform);
+    }
+    return byOrder;
+  }, [operationQuery.data]);
 
   const issues: OaFieldIssue[] = useMemo(() => {
     if (!validationRun) {
@@ -169,53 +184,45 @@ export function VerifyScreen(): ReactElement {
       ) : null}
 
       <div className={styles.layout}>
-        <Card title="OA Summary">
-          {rows.length === 0 ? (
-            <p className={styles.empty}>
-              No validation results yet.{" "}
-              <button type="button" className={styles.recheckButton} onClick={handleRecheck}>
-                Re-check
-              </button>
-            </p>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>OA</th>
-                  <th>Platform</th>
-                  <th>Input Complete</th>
-                  <th>AI Validation</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.oaOrder}>
-                    <td>OA #{row.oaOrder}</td>
-                    <td>Android</td>
-                    <td>
-                      {row.inputComplete ? (
-                        <StatusBadge status="PASSED" label="Complete" />
-                      ) : (
-                        <StatusBadge status="WARNING" label="Missing Input" />
-                      )}
-                    </td>
-                    <td>
-                      {row.aiValidationStatus === "MISSING_INPUT" ? (
-                        <StatusBadge status="WARNING" label="Missing Input" />
-                      ) : (
-                        <StatusBadge status={row.aiValidationStatus} />
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge status={row.overallStatus} />
-                    </td>
+        <div className={styles.leftColumn}>
+          <Card title="OA Summary">
+            {rows.length === 0 ? (
+              <p className={styles.empty}>
+                No validation results yet.{" "}
+                <button type="button" className={styles.recheckButton} onClick={handleRecheck}>
+                  Re-check
+                </button>
+              </p>
+            ) : (
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>OA</th>
+                    <th>Platform</th>
+                    <th>AI Validation</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.oaOrder}>
+                      <td>OA #{row.oaOrder}</td>
+                      <td>{platformByOaOrder.get(row.oaOrder) ?? "—"}</td>
+                      <td>
+                        {row.aiValidationStatus === "MISSING_INPUT" ? (
+                          <StatusBadge status="WARNING" label="Missing Input" />
+                        ) : (
+                          <StatusBadge status={row.aiValidationStatus} />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+
+          <p className={styles.hint}>Sửa đổi hoặc bổ sung thông tin tại các OA bị lỗi và kiểm tra lại.</p>
+        </div>
 
         <Card title={`Issues Found (${issues.length})`}>
           {issues.length === 0 ? (
@@ -234,8 +241,6 @@ export function VerifyScreen(): ReactElement {
           )}
         </Card>
       </div>
-
-      <p className={styles.hint}>Sửa đổi hoặc bổ sung thông tin tại các OA bị lỗi và kiểm tra lại.</p>
 
       <div className={styles.actions}>
         <DisabledReason reason={generateDisabledReason}>

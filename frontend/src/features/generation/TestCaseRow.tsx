@@ -55,14 +55,12 @@ export function TestCaseRow({ testCase }: TestCaseRowProps): ReactElement {
               <dd>
                 {testCase.templateId} (v{testCase.templateVersion})
               </dd>
-              <dt>Expected header</dt>
-              <dd>{testCase.parameters.expectedHeader}</dd>
-              <dt>Expected body</dt>
-              <dd>{testCase.parameters.expectedBody}</dd>
-              <dt>Expected button text</dt>
-              <dd>{testCase.parameters.expectedButtonText}</dd>
-              <dt>Expected redirect</dt>
-              <dd>{testCase.parameters.expectedRedirectUrl}</dd>
+              {(catalogEntry?.fields ?? []).map((field) => (
+                <div key={field.key}>
+                  <dt>{field.label}</dt>
+                  <dd>{testCase.parameters[field.key]}</dd>
+                </div>
+              ))}
               {!isReady && testCase.reason ? (
                 <>
                   <dt>Not ready reason</dt>

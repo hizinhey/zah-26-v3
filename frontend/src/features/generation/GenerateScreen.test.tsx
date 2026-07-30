@@ -128,7 +128,7 @@ describe("GenerateScreen", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Open OA form verification" }));
 
-    expect(screen.getByText(/Expected header/)).toBeInTheDocument();
+    expect(screen.getByText(/OA name/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Add Test Case/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Delete/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Rerun/i })).not.toBeInTheDocument();

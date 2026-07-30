@@ -47,6 +47,12 @@
   display: flex;
   align-items: center;
   gap: var(--ops-space-1);
+  cursor: grab;
+  touch-action: none;
+}
+
+.tabGroup:active {
+  cursor: grabbing;
 }
 
 .tab {
@@ -96,11 +102,7 @@
 
 .hint {
   margin: 0;
-  padding: var(--ops-space-4);
-  background: var(--ops-color-white);
-  border: 1px solid var(--ops-color-gray-200);
-  border-radius: var(--ops-radius-md);
-  color: var(--ops-color-gray-700);
+  color: var(--ops-color-gray-500);
   font-size: var(--ops-font-size-sm);
 }
 
@@ -153,4 +155,9 @@
 .validateButton {
   padding: var(--ops-space-4) var(--ops-space-8);
   font-size: var(--ops-font-size-lg);
+}
+
+.validateButton svg {
+  width: 20px;
+  height: 20px;
 }

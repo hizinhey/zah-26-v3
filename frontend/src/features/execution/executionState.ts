@@ -149,3 +149,32 @@ export function hydrateFromResults(state: ExecutionState, results: ExecutionTest
   }
   return changed ? { ...state, cases } : state;
 }
+
+function isTerminalStatus(status: TestCaseStatus): boolean {
+  return status === "PASSED" || status === "FAILED" || status === "ERROR";
+}
+
+/**
+ * Marks the REST poll's `runningTestCaseId` (GET /api/v1/executions/{id}) as RUNNING in the
+ * reducer's case map - the only way a PENDING row ever becomes RUNNING when the browser
+ * WebSocket can't connect and JOB_PROGRESS envelopes never reach the tab directly. Never
+ * regresses a case that's already reached a terminal outcome (an out-of-order/stale poll
+ * response must not un-finish a case that a later envelope or poll already completed), and is a
+ * no-op once `runningTestCaseId` is null (nothing currently in flight).
+ */
+export function hydrateRunningTestCase(state: ExecutionState, runningTestCaseId: string | null): ExecutionState {
+  if (!runningTestCaseId) {
+    return state;
+  }
+  const previous = state.cases[runningTestCaseId] ?? initialCaseState();
+  if (isTerminalStatus(previous.status) || previous.status === "RUNNING") {
+    return state;
+  }
+  return {
+    ...state,
+    cases: {
+      ...state.cases,
+      [runningTestCaseId]: { ...previous, status: "RUNNING" },
+    },
+  };
+}

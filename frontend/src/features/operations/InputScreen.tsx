@@ -1,6 +1,22 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
 import { StepProgress } from "../../components/StepProgress";
 import { OperationBreadcrumb } from "../../components/OperationBreadcrumb";
 import { Card } from "../../components/Card";
@@ -49,6 +65,72 @@ function isOaComplete(oa: OfficialAccountInput): boolean {
   );
 }
 
+interface SortableOaTabProps {
+  dragId: string;
+  index: number;
+  isActive: boolean;
+  canRemove: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+}
+
+/** One draggable OA tab. Dragging reorders via the DndContext in InputScreen; a plain click
+ * (no pointer movement past the activation distance) still selects the tab as before. */
+function SortableOaTab({
+  dragId,
+  index,
+  isActive,
+  canRemove,
+  onSelect,
+  onRemove,
+}: SortableOaTabProps): ReactElement {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: dragId,
+  });
+  const style: CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={styles.tabGroup}
+      data-testid={`oa-tab-${index}`}
+      {...attributes}
+      {...listeners}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={isActive}
+        className={`${styles.tab} ${isActive ? styles.tabActive : ""}`}
+        onClick={onSelect}
+      >
+        OA #{index + 1}
+      </button>
+      {isActive ? (
+        <span className={styles.tabActions}>
+          <button
+            type="button"
+            aria-label={`Remove OA #${index + 1}`}
+            className={styles.tabActionButton}
+            disabled={!canRemove}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+          >
+            ✕
+          </button>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function InputScreen(): ReactElement {
   const params = useParams<{ operationId: string }>();
   const operationId = params.operationId ?? NEW_OPERATION_ID;
@@ -67,6 +149,16 @@ export function InputScreen(): ReactElement {
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const initialized = useRef(false);
 
+  // Stable drag-and-drop identity for each OA tab, independent of its position in `oas` (which
+  // moves on reorder) and independent of the OA's own data (a brand-new OA has no server id yet).
+  // Kept in lockstep with `oas` by every operation that adds/removes/reorders it below.
+  const nextOaKey = useRef(0);
+  const [oaKeys, setOaKeys] = useState<string[]>(() => [String(nextOaKey.current++)]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   useEffect(() => {
     if (initialized.current) {
       return;
@@ -74,11 +166,11 @@ export function InputScreen(): ReactElement {
     if (operationQuery.data) {
       initialized.current = true;
       setJiraId(operationQuery.data.jiraId);
-      setOas(
-        operationQuery.data.oas.length > 0
-          ? operationQuery.data.oas.map((oa) => ({ ...oa }))
-          : [emptyOa()],
-      );
+      const nextOas = operationQuery.data.oas.length > 0
+        ? operationQuery.data.oas.map((oa) => ({ ...oa }))
+        : [emptyOa()];
+      setOas(nextOas);
+      setOaKeys(nextOas.map(() => String(nextOaKey.current++)));
     }
   }, [operationQuery.data]);
 
@@ -106,6 +198,7 @@ export function InputScreen(): ReactElement {
       setActiveIndex(next.length - 1);
       return next;
     });
+    setOaKeys((current) => [...current, String(nextOaKey.current++)]);
   }
 
   function removeOa(index: number): void {
@@ -117,20 +210,29 @@ export function InputScreen(): ReactElement {
       setActiveIndex((activeCurrent) => Math.max(0, Math.min(activeCurrent, next.length - 1)));
       return next;
     });
+    setOaKeys((current) => (current.length <= 1 ? current : current.filter((_, keyIndex) => keyIndex !== index)));
   }
 
-  function moveOa(index: number, direction: -1 | 1): void {
-    setOas((current) => {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= current.length) {
-        return current;
-      }
-      const next = [...current];
-      const [moved] = next.splice(index, 1);
-      next.splice(targetIndex, 0, moved);
-      setActiveIndex(targetIndex);
-      return next;
-    });
+  function moveOaTo(fromIndex: number, toIndex: number): void {
+    if (fromIndex === toIndex) {
+      return;
+    }
+    setOas((current) => arrayMove(current, fromIndex, toIndex));
+    setOaKeys((current) => arrayMove(current, fromIndex, toIndex));
+    setActiveIndex(toIndex);
+  }
+
+  function handleOaDragEnd(event: DragEndEvent): void {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+    const fromIndex = oaKeys.indexOf(String(active.id));
+    const toIndex = oaKeys.indexOf(String(over.id));
+    if (fromIndex === -1 || toIndex === -1) {
+      return;
+    }
+    moveOaTo(fromIndex, toIndex);
   }
 
   const requiredFieldsFilled = jiraId.trim().length > 0 && oas.every(isOaComplete);
@@ -231,55 +333,26 @@ export function InputScreen(): ReactElement {
           </div>
 
           <div className={styles.tabsWrapper}>
-            <div className={styles.tabs} role="tablist" aria-label="Official accounts">
-              {oas.map((oa, index) => (
-                <div key={index} className={styles.tabGroup}>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={index === activeIndex}
-                    className={`${styles.tab} ${index === activeIndex ? styles.tabActive : ""}`}
-                    onClick={() => setActiveIndex(index)}
-                  >
-                    OA #{index + 1}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOaDragEnd}>
+              <SortableContext items={oaKeys} strategy={horizontalListSortingStrategy}>
+                <div className={styles.tabs} role="tablist" aria-label="Official accounts">
+                  {oas.map((oa, index) => (
+                    <SortableOaTab
+                      key={oaKeys[index]}
+                      dragId={oaKeys[index]}
+                      index={index}
+                      isActive={index === activeIndex}
+                      canRemove={oas.length > 1}
+                      onSelect={() => setActiveIndex(index)}
+                      onRemove={() => removeOa(index)}
+                    />
+                  ))}
+                  <button type="button" className={styles.addOa} onClick={addOa}>
+                    + Add OA
                   </button>
-                  {index === activeIndex ? (
-                    <span className={styles.tabActions}>
-                      <button
-                        type="button"
-                        aria-label={`Move OA #${index + 1} earlier`}
-                        className={styles.tabActionButton}
-                        disabled={index === 0}
-                        onClick={() => moveOa(index, -1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Move OA #${index + 1} later`}
-                        className={styles.tabActionButton}
-                        disabled={index === oas.length - 1}
-                        onClick={() => moveOa(index, 1)}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Remove OA #${index + 1}`}
-                        className={styles.tabActionButton}
-                        disabled={oas.length <= 1}
-                        onClick={() => removeOa(index)}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ) : null}
                 </div>
-              ))}
-              <button type="button" className={styles.addOa} onClick={addOa}>
-                + Add OA
-              </button>
-            </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
           {activeOa ? (
@@ -328,11 +401,11 @@ export function InputScreen(): ReactElement {
                 </button>
               </DisabledReason>
             </div>
-            <p className={styles.hint}>
-              {requiredFieldsFilled
-                ? "Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo."
-                : "Vui lòng nhập đầy đủ thông tin cho OA đang chọn."}
-            </p>
+            {requiredFieldsFilled ? (
+              <p className={styles.hint}>
+                Sau khi Verify, bạn có thể tiếp tục với các bước tiếp theo.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

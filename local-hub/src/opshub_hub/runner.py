@@ -294,6 +294,8 @@ class Runner:
         and upload it separately from the TEST_RESULT envelope. The local file is
         left on disk if the upload fails or no uploader is configured, so it can
         be retried without losing evidence."""
+        test_result_id = deterministic_test_result_id(execution_id, test_case.testCaseId, record.attempt)
+
         if self._screenshot_capturer is None:
             # Not a silent no-op (C3): make it visible in the Hub's own logs that evidence is
             # not being captured for this test result, so a misconfigured/omitted capturer is
@@ -304,18 +306,48 @@ class Runner:
                 test_case.testCaseId,
                 record.attempt,
             )
-            return
-        destination = evidence_dir / f"{test_case.testCaseId}-attempt{record.attempt}.png"
-        try:
-            screenshot_path = self._screenshot_capturer(destination)
-        except Exception:
-            return
+        else:
+            destination = evidence_dir / f"{test_case.testCaseId}-attempt{record.attempt}.png"
+            try:
+                screenshot_path = self._screenshot_capturer(destination)
+            except Exception:
+                screenshot_path = None
+            if screenshot_path is not None and self._evidence_uploader is not None:
+                evidence = EvidenceFile(path=screenshot_path, evidence_type=EvidenceType.SCREENSHOT)
+                try:
+                    self._evidence_uploader.upload(test_result_id, evidence)
+                except EvidenceUploadError:
+                    # Local file is preserved on disk until a future acknowledged upload.
+                    pass
+
+        # Independent of the generic screenshot above (and of whether it succeeded): a spec page
+        # may have saved its own comparison evidence directly, which this captures separately.
+        self._upload_and_clear_page_evidence(test_result_id, evidence_dir)
+
+    # Fixed filenames a spec page saves directly, at the moment of a comparison it made itself
+    # (e.g. zbusiness-chat.page.ts's isLastCardThumbnailMatching, on a thumbnail mismatch) - not
+    # this method's own post-hoc screenshot, which fires after the after() hook has already
+    # terminated the app and so cannot show what was actually being compared. Execution runs one
+    # test case at a time, so only the test case that just finished could have written these.
+    _PAGE_EVIDENCE_FILENAMES = ("thumbnail-mismatch-actual.png", "thumbnail-mismatch-reference.png")
+
+    def _upload_and_clear_page_evidence(self, test_result_id: UUID, evidence_dir: Path) -> None:
         if self._evidence_uploader is None:
             return
-        evidence = EvidenceFile(path=screenshot_path, evidence_type=EvidenceType.SCREENSHOT)
-        test_result_id = deterministic_test_result_id(execution_id, test_case.testCaseId, record.attempt)
-        try:
-            self._evidence_uploader.upload(test_result_id, evidence)
-        except EvidenceUploadError:
-            # Local file is preserved on disk until a future acknowledged upload.
-            return
+        for filename in self._PAGE_EVIDENCE_FILENAMES:
+            path = evidence_dir / filename
+            if not path.exists():
+                continue
+            try:
+                self._evidence_uploader.upload(
+                    test_result_id, EvidenceFile(path=path, evidence_type=EvidenceType.SCREENSHOT)
+                )
+            except EvidenceUploadError:
+                logger.warning("Failed to upload page evidence %s for test result %s", filename, test_result_id)
+            finally:
+                # Always remove, upload outcome notwithstanding: these filenames are shared
+                # across every test case that runs this spec, so leaving a failed-to-upload
+                # file in place would let it be mistakenly attributed to a later test case
+                # that never actually hit a mismatch (a worse outcome than losing one
+                # supplementary comparison image on a rare upload failure).
+                path.unlink(missing_ok=True)

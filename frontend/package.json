@@ -11,6 +11,8 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@dnd-kit/core": "latest",
+    "@dnd-kit/sortable": "latest",
     "@tanstack/react-query": "latest",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
